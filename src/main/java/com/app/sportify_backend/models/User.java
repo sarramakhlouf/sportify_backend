@@ -7,6 +7,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.data.mongodb.core.index.Indexed;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -22,6 +23,9 @@ public class User implements UserDetails {
 
     private String firstname;
     private String lastname;
+
+
+    @Indexed(unique = true)
     private String email;
 
     @JsonIgnore

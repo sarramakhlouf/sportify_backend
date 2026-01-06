@@ -22,7 +22,7 @@ public class TeamService {
     private final TeamRepository teamRepository;
 
     public Team createTeam(Team team, MultipartFile image) throws IOException {
-        // Enregistrer le team en DB avant d'uploader l'image (pour avoir l'ID si nécessaire)
+        team.setIsActivated(false);
         team = teamRepository.save(team);
 
         if (image != null && !image.isEmpty()) {
@@ -57,8 +57,32 @@ public class TeamService {
             team.setCity(updatedTeam.getCity());
             team.setColor(updatedTeam.getColor());
             team.setLogoUrl(updatedTeam.getLogoUrl());
+            team.setIsActivated(updatedTeam.getIsActivated());
             return teamRepository.save(team);
         }).orElseThrow(() -> new RuntimeException("Team not found"));
+    }
+
+    public Team activateTeam(String teamId, String ownerId) {
+        List<Team> ownerTeams = teamRepository.findByOwnerId(ownerId);
+
+        for (Team t : ownerTeams) {
+            if (t.getId().equals(teamId)) {
+                t.setIsActivated(true);
+            } else {
+                t.setIsActivated(false);
+            }
+            teamRepository.save(t);
+        }
+
+        return teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("Team not found"));
+    }
+
+    public Team deactivateTeam(String teamId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("Team not found"));
+        team.setIsActivated(false);
+        return teamRepository.save(team);
     }
 
     public void deleteTeam(String id) {

@@ -29,12 +29,19 @@ public class JwtService {
 
     // Extraire email depuis token
     public String extractEmail(String token) {
-        Claims claims = Jwts.parser()
-                .setSigningKey(SECRET_KEY)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-        return claims.getSubject();
+        try {
+            Claims claims = Jwts.parser()
+                    .setSigningKey(SECRET_KEY)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+            return claims.getSubject();
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            // Token expiré, mais on peut récupérer l'email pour refresh
+            return e.getClaims().getSubject();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // Vérifier si le token est valide
@@ -48,5 +55,14 @@ public class JwtService {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public String generateRefreshToken(User user) {
+        return Jwts.builder()
+                .setSubject(user.getEmail())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7)) // 7 jours
+                .signWith(SECRET_KEY, SignatureAlgorithm.HS256)
+                .compact();
     }
 }

@@ -38,6 +38,16 @@ public class TeamController {
         return teamService.updateTeam(id, team);
     }
 
+    @PutMapping("/activate/{teamId}/owner/{ownerId}")
+    public Team activateTeam(@PathVariable String teamId, @PathVariable String ownerId) {
+        return teamService.activateTeam(teamId, ownerId);
+    }
+
+    @PutMapping("/deactivate/{teamId}")
+    public Team deactivateTeam(@PathVariable String teamId) {
+        return teamService.deactivateTeam(teamId);
+    }
+
     @DeleteMapping("/{id}")
     public void deleteTeam(@PathVariable String id) {
         teamService.deleteTeam(id);

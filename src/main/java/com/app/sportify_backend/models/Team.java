@@ -18,6 +18,9 @@ public class Team {
     private String city;
     private String color;
     private String logoUrl;
+    private Boolean isActivated = false;
 
     private String ownerId;
+
+
 }

@@ -37,6 +37,10 @@ public class UserService {
 
     public User registerUser(RegisterRequest request, MultipartFile image) {
 
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("EMAIL_ALREADY_EXISTS");
+        }
+
         if (request.getPassword().length() < 8) {
             throw new IllegalArgumentException("Le mot de passe doit contenir au moins 8 caractères");
         }
