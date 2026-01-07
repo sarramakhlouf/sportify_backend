@@ -3,9 +3,14 @@ package com.app.sportify_backend.services;
 import com.app.sportify_backend.dto.ForgotPasswordRequest;
 import com.app.sportify_backend.dto.RegisterRequest;
 import com.app.sportify_backend.models.Role;
+import com.app.sportify_backend.models.Team;
+import com.app.sportify_backend.models.TeamMember;
 import com.app.sportify_backend.models.User;
+import com.app.sportify_backend.repositories.TeamMemberRepository;
+import com.app.sportify_backend.repositories.TeamRepository;
 import com.app.sportify_backend.repositories.UserRepository;
 import com.app.sportify_backend.security.JwtService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -14,18 +19,28 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Random;
 
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
+    private final TeamMemberRepository teamMemberRepository;
+    private final TeamRepository teamRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailService emailService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService){
+    public UserService(UserRepository userRepository,
+                       TeamRepository teamRepository,
+                       TeamMemberRepository teamMemberRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtService jwtService,
+                       EmailService emailService){
         this.userRepository = userRepository;
+        this.teamRepository = teamRepository;
+        this.teamMemberRepository = teamMemberRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.emailService = emailService;
@@ -166,5 +181,16 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(newPassword));
         return userRepository.save(user);
     }
+
+    public List<Team> getMyTeams(String userId) {
+        List<TeamMember> memberships = teamMemberRepository.findByUserId(userId);
+
+        List<String> teamIds = memberships.stream()
+                .map(TeamMember::getTeamId)
+                .toList();
+
+        return teamRepository.findAllById(teamIds);
+    }
+
 
 }

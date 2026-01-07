@@ -1,7 +1,11 @@
 package com.app.sportify_backend.services;
 
-import com.app.sportify_backend.models.Team;
+import com.app.sportify_backend.dto.TeamPlayerResponse;
+import com.app.sportify_backend.models.*;
+import com.app.sportify_backend.repositories.InvitationRepository;
+import com.app.sportify_backend.repositories.TeamMemberRepository;
 import com.app.sportify_backend.repositories.TeamRepository;
+import com.app.sportify_backend.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -11,6 +15,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,8 +23,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class TeamService {
-
     private final TeamRepository teamRepository;
+    private final TeamMemberRepository teamMemberRepository;
+    private final UserRepository userRepository;
 
     public Team createTeam(Team team, MultipartFile image) throws IOException {
         team.setIsActivated(false);
@@ -30,12 +36,10 @@ public class TeamService {
                     .substring(image.getOriginalFilename().lastIndexOf("."));
             String filename = team.getId() + "_" + UUID.randomUUID() + fileExtension;
 
-            // chemin relatif au projet / création des dossiers si nécessaire
             Path uploadPath = Paths.get("uploads/teams/" + filename);
-            Files.createDirectories(uploadPath.getParent()); // crée le dossier si pas existant
+            Files.createDirectories(uploadPath.getParent());
             Files.write(uploadPath, image.getBytes());
 
-            // stocker le chemin ou URL dans l'entité Team
             team.setLogoUrl("/uploads/teams/" + filename);
             team = teamRepository.save(team);
         }
@@ -83,6 +87,26 @@ public class TeamService {
                 .orElseThrow(() -> new RuntimeException("Team not found"));
         team.setIsActivated(false);
         return teamRepository.save(team);
+    }
+
+    public List<TeamPlayerResponse> getTeamPlayers(String teamId) {
+
+        List<TeamMember> members = teamMemberRepository.findByTeamId(teamId);
+
+        return members.stream().map(member -> {
+            var user = userRepository.findById(member.getUserId())
+                    .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
+
+            return TeamPlayerResponse.builder()
+                    .userId(user.getId())
+                    .firstname(user.getFirstname())
+                    .lastname(user.getLastname())
+                    .email(user.getEmail())
+                    .profileImage(user.getProfileImage())
+                    .playerCode(user.getPlayerCode())
+                    .role(member.getRole().name())
+                    .build();
+        }).toList();
     }
 
     public void deleteTeam(String id) {

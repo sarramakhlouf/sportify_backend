@@ -32,7 +32,10 @@ public class User implements UserDetails {
     private String password;
 
     private Role role;
+
+    @Indexed(unique = true)
     private String playerCode;
+
     private boolean isEnabled = true;
     private LocalDateTime registrationDate;
     private String profileImage;

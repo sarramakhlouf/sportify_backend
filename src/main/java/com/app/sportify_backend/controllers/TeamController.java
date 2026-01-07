@@ -1,5 +1,6 @@
 package com.app.sportify_backend.controllers;
 
+import com.app.sportify_backend.dto.TeamPlayerResponse;
 import com.app.sportify_backend.models.Team;
 import com.app.sportify_backend.services.TeamService;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,11 @@ public class TeamController {
     @PutMapping("/deactivate/{teamId}")
     public Team deactivateTeam(@PathVariable String teamId) {
         return teamService.deactivateTeam(teamId);
+    }
+
+    @GetMapping("/{teamId}/players")
+    public List<TeamPlayerResponse> getTeamPlayers(@PathVariable String teamId) {
+        return teamService.getTeamPlayers(teamId);
     }
 
     @DeleteMapping("/{id}")
