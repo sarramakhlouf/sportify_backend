@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
@@ -24,6 +25,7 @@ public class AuthController {
     private final UserService userService;
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
 
     // ------------------ REGISTER ------------------
     @PostMapping(
@@ -31,10 +33,14 @@ public class AuthController {
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
     public ResponseEntity<?> register(
-            @RequestPart("data") RegisterRequest request,
+            @RequestPart("data") String data,
             @RequestPart(value = "image", required = false) MultipartFile image
     ) {
         try {
+
+            // convertir le JSON en RegisterRequest
+            RegisterRequest request = objectMapper.readValue(data, RegisterRequest.class);
+
             System.out.println("Register reçu: " + request.getEmail());
             User user = userService.registerUser(request, image);
             return ResponseEntity.status(HttpStatus.CREATED).body(

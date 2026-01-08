@@ -16,6 +16,7 @@ public class InvitationService {
     private final UserRepository userRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final InvitationRepository invitationRepository;
+    private final NotificationService notificationService;
 
     public Invitation invitePlayer(String teamId, String senderId, String playerCode) {
 
@@ -26,7 +27,7 @@ public class InvitationService {
             throw new RuntimeException("ALREADY_MEMBER");
         }
 
-        return invitationRepository.save(
+        Invitation invitation = invitationRepository.save(
                 Invitation.builder()
                         .teamId(teamId)
                         .senderId(senderId)
@@ -35,6 +36,16 @@ public class InvitationService {
                         .createdAt(LocalDateTime.now())
                         .build()
         );
+
+        notificationService.send(
+                receiver.getId(),
+                "Invitation d’équipe",
+                "Vous avez reçu une invitation pour rejoindre une équipe",
+                NotificationType.INVITATION_RECEIVED,
+                invitation.getId()
+        );
+
+        return invitation;
     }
 
     public void acceptInvitation(String invitationId, String userId) {
@@ -56,6 +67,14 @@ public class InvitationService {
                         .role(MemberRole.MEMBER)
                         .build()
         );
+
+        notificationService.send(
+                invitation.getSenderId(),
+                "Invitation acceptée",
+                "Votre invitation a été acceptée",
+                NotificationType.INVITATION_ACCEPTED,
+                invitation.getId()
+        );
     }
 
     public void refuseInvitation(String invitationId, String userId) {
@@ -73,5 +92,13 @@ public class InvitationService {
 
         invitation.setStatus(InvitationStatus.REJECTED);
         invitationRepository.save(invitation);
+
+        notificationService.send(
+                invitation.getSenderId(),
+                "Invitation refusée",
+                "Votre invitation a été refusée",
+                NotificationType.INVITATION_REJECTED,
+                invitation.getId()
+        );
     }
 }
