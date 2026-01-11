@@ -2,6 +2,7 @@ package com.app.sportify_backend.services;
 
 import com.app.sportify_backend.dto.ForgotPasswordRequest;
 import com.app.sportify_backend.dto.RegisterRequest;
+import com.app.sportify_backend.dto.UpdateProfileRequest;
 import com.app.sportify_backend.models.Role;
 import com.app.sportify_backend.models.Team;
 import com.app.sportify_backend.models.TeamMember;
@@ -10,6 +11,7 @@ import com.app.sportify_backend.repositories.TeamMemberRepository;
 import com.app.sportify_backend.repositories.TeamRepository;
 import com.app.sportify_backend.repositories.UserRepository;
 import com.app.sportify_backend.security.JwtService;
+import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import java.util.List;
 import java.util.Random;
 
 @Service
+@AllArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
@@ -31,24 +34,6 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailService emailService;
-
-    public UserService(UserRepository userRepository,
-                       TeamRepository teamRepository,
-                       TeamMemberRepository teamMemberRepository,
-                       PasswordEncoder passwordEncoder,
-                       JwtService jwtService,
-                       EmailService emailService){
-        this.userRepository = userRepository;
-        this.teamRepository = teamRepository;
-        this.teamMemberRepository = teamMemberRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
-        this.emailService = emailService;
-    }
-
-    public User save(User user) {
-        return userRepository.save(user);
-    }
 
     public User registerUser(RegisterRequest request, MultipartFile image) {
 
@@ -64,6 +49,7 @@ public class UserService {
         user.setFirstname(request.getFirstname());
         user.setLastname(request.getLastname());
         user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(request.getRole());
         user.setRegistrationDate(LocalDateTime.now());
@@ -85,7 +71,7 @@ public class UserService {
                 Files.createDirectories(path.getParent());
                 Files.write(path, image.getBytes());
 
-                user.setProfileImage("/uploads/profile/" + fileName);
+                user.setProfileImageUrl("/uploads/profile/" + fileName);
                 user = userRepository.save(user);
             } catch (Exception e) {
                 throw new RuntimeException("Erreur lors de l'upload de l'image");
@@ -192,5 +178,39 @@ public class UserService {
         return teamRepository.findAllById(teamIds);
     }
 
+    public User updateProfile(
+            String userId, UpdateProfileRequest request,
+            String currentPassword, MultipartFile image) {
 
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new RuntimeException("Mot de passe actuel incorrect");
+        }
+
+        user.setFirstname(request.getFirstname());
+        user.setLastname(request.getLastname());
+        user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+
+        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+
+        if (image != null && !image.isEmpty()) {
+            try {
+                String fileName = user.getId() + "_" + image.getOriginalFilename();
+                Path path = Paths.get("uploads/profile/" + fileName);
+
+                Files.createDirectories(path.getParent());
+                Files.write(path, image.getBytes());
+
+                user.setProfileImageUrl("/uploads/profile/" + fileName);
+            } catch (Exception e) {
+                throw new RuntimeException("Erreur lors de l'upload de l'image");
+            }
+        }
+        return userRepository.save(user);
+    }
 }

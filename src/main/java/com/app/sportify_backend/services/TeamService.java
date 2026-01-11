@@ -102,7 +102,7 @@ public class TeamService {
                     .firstname(user.getFirstname())
                     .lastname(user.getLastname())
                     .email(user.getEmail())
-                    .profileImage(user.getProfileImage())
+                    .profileImage(user.getProfileImageUrl())
                     .playerCode(user.getPlayerCode())
                     .role(member.getRole().name())
                     .build();

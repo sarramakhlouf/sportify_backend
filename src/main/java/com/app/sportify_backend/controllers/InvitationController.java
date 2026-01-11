@@ -5,6 +5,8 @@ import com.app.sportify_backend.services.InvitationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/invitations")
 @RequiredArgsConstructor
@@ -32,6 +34,11 @@ public class InvitationController {
             @RequestParam String userId
     ) {
         invitationService.refuseInvitation(id, userId);
+    }
+
+    @GetMapping("/pending/{userId}")
+    public List<Invitation> getPendingInvitations(@PathVariable String userId) {
+        return invitationService.getPendingInvitations(userId);
     }
 
 }

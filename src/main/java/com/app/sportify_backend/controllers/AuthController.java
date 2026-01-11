@@ -2,6 +2,7 @@ package com.app.sportify_backend.controllers;
 
 import com.app.sportify_backend.dto.LoginRequest;
 import com.app.sportify_backend.dto.RegisterRequest;
+import com.app.sportify_backend.dto.UpdateProfileRequest;
 import com.app.sportify_backend.models.User;
 import com.app.sportify_backend.repositories.UserRepository;
 import com.app.sportify_backend.security.JwtService;
@@ -19,7 +20,7 @@ import java.util.Map;
 @RestController
 @AllArgsConstructor
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*") // Permet les requêtes depuis Flutter
+@CrossOrigin(origins = "*")
 public class AuthController {
 
     private final UserService userService;
@@ -27,11 +28,7 @@ public class AuthController {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
-    // ------------------ REGISTER ------------------
-    @PostMapping(
-            value = "/register",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-    )
+    @PostMapping( value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE )
     public ResponseEntity<?> register(
             @RequestPart("data") String data,
             @RequestPart(value = "image", required = false) MultipartFile image
@@ -61,7 +58,6 @@ public class AuthController {
         }
     }
 
-    // ------------------ LOGIN ------------------
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request) {
         System.out.println("Login reçu pour: " + request.getEmail());
@@ -69,11 +65,15 @@ public class AuthController {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        // Générer access token
-        String accessToken = userService.loginUser(request.getEmail(), request.getPassword());
+        String accessToken = userService.loginUser(
+                request.getEmail(),
+                request.getPassword()
+        );
 
-        // Générer refresh token
         String refreshToken = jwtService.generateRefreshToken(user);
+
+        user.setRefreshToken(refreshToken);
+        userRepository.save(user);
 
         return ResponseEntity.ok(Map.of(
                 "accessToken", accessToken,
@@ -82,7 +82,29 @@ public class AuthController {
         ));
     }
 
-    // ------------------ AUTO-LOGIN ------------------
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout(
+            @RequestHeader("Authorization") String authHeader
+    ) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Token manquant"));
+        }
+
+        String token = authHeader.substring(7);
+        String email = jwtService.extractEmail(token);
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        user.setRefreshToken(null);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(
+                Map.of("message", "Déconnexion réussie")
+        );
+    }
+
     @GetMapping("/auto-login")
     public ResponseEntity<User> autoLogin(@RequestHeader("Authorization") String authHeader) {
         System.out.println("Auto-login header: " + authHeader);
@@ -97,7 +119,6 @@ public class AuthController {
         return ResponseEntity.ok(user);
     }
 
-    // ------------------ VERIFY MANAGER ------------------
     @PostMapping("/verify/{userId}")
     public ResponseEntity<Map<String, Object>> verifyManager(@PathVariable String userId) {
         User user = userService.verifyManager(userId);
@@ -107,7 +128,6 @@ public class AuthController {
         ));
     }
 
-    // ------------------ FORGOT PASSWORD ------------------
     @PostMapping("/forgot-password/request-otp")
     public ResponseEntity<Map<String, String>> requestOtp(@RequestParam String email) {
         System.out.println("OTP demandé pour: " + email);
@@ -163,4 +183,35 @@ public class AuthController {
             return ResponseEntity.status(403).body("Refresh token expiré ou invalide");
         }
     }
+
+    @GetMapping("/users/{id}")
+    public User getUserById(@PathVariable String id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
+    }
+
+    @PostMapping(
+            value = "/users/{id}/update-profile",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public ResponseEntity<User> updateProfile(
+            @PathVariable String id,
+            @RequestPart("data") String data,
+            @RequestPart(value = "image", required = false) MultipartFile image
+    ) throws Exception {
+
+        UpdateProfileRequest request =
+                objectMapper.readValue(data, UpdateProfileRequest.class);
+
+        if (request.getCurrentPassword() == null || request.getCurrentPassword().isEmpty()) {
+            throw new RuntimeException("Le mot de passe actuel est requis");
+        }
+
+        User updatedUser = userService.updateProfile(id, request, request.getCurrentPassword(), image);
+        updatedUser.setPassword(null);
+
+        return ResponseEntity.ok(updatedUser);
+    }
+
+
 }

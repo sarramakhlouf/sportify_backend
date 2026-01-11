@@ -28,6 +28,8 @@ public class User implements UserDetails {
     @Indexed(unique = true)
     private String email;
 
+    private String phone;
+
     @JsonIgnore
     private String password;
 
@@ -38,11 +40,12 @@ public class User implements UserDetails {
 
     private boolean isEnabled = true;
     private LocalDateTime registrationDate;
-    private String profileImage;
+    private String profileImageUrl;
     private String resetOtp;
     private LocalDateTime otpExpiration;
 
-    // ================= UserDetails =================
+    @JsonIgnore
+    private String refreshToken;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

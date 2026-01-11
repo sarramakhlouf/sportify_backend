@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -101,4 +102,10 @@ public class InvitationService {
                 invitation.getId()
         );
     }
+
+    public List<Invitation> getPendingInvitations(String userId) {
+        return invitationRepository
+                .findByReceiverIdAndStatus(userId, InvitationStatus.PENDING);
+    }
+
 }
