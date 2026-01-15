@@ -4,4 +4,3 @@ public enum MemberRole {
     OWNER,
     MEMBER
 }
-

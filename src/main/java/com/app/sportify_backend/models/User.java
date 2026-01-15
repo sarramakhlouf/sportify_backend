@@ -10,8 +10,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.data.mongodb.core.index.Indexed;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 
 @Document(collection = "users")
 @Getter
@@ -47,28 +49,34 @@ public class User implements UserDetails {
     @JsonIgnore
     private String refreshToken;
 
+    private List<String> teamIds = new ArrayList<>();
+
     @Override
+    @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Collections.emptyList();
-        // (on ajoutera les rôles plus tard si besoin)
     }
 
     @Override
+    @JsonIgnore
     public String getUsername() {
         return email;
     }
 
     @Override
+    @JsonIgnore
     public boolean isAccountNonExpired() {
         return true;
     }
 
     @Override
+    @JsonIgnore
     public boolean isAccountNonLocked() {
         return true;
     }
 
     @Override
+    @JsonIgnore
     public boolean isCredentialsNonExpired() {
         return true;
     }

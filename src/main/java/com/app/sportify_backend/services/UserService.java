@@ -5,14 +5,11 @@ import com.app.sportify_backend.dto.RegisterRequest;
 import com.app.sportify_backend.dto.UpdateProfileRequest;
 import com.app.sportify_backend.models.Role;
 import com.app.sportify_backend.models.Team;
-import com.app.sportify_backend.models.TeamMember;
 import com.app.sportify_backend.models.User;
-import com.app.sportify_backend.repositories.TeamMemberRepository;
 import com.app.sportify_backend.repositories.TeamRepository;
 import com.app.sportify_backend.repositories.UserRepository;
 import com.app.sportify_backend.security.JwtService;
 import lombok.AllArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,7 +26,6 @@ import java.util.Random;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final TeamMemberRepository teamMemberRepository;
     private final TeamRepository teamRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -55,7 +51,7 @@ public class UserService {
         user.setRegistrationDate(LocalDateTime.now());
 
         if (request.getRole() == Role.PLAYER) {
-            user.setPlayerCode(CodeGenerator.generatePlayerCode(8));
+            user.setPlayerCode(CodeGenerator.generatePlayerCode());
             user.setEnabled(true);
         } else {
             user.setEnabled(false);
@@ -169,13 +165,10 @@ public class UserService {
     }
 
     public List<Team> getMyTeams(String userId) {
-        List<TeamMember> memberships = teamMemberRepository.findByUserId(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
 
-        List<String> teamIds = memberships.stream()
-                .map(TeamMember::getTeamId)
-                .toList();
-
-        return teamRepository.findAllById(teamIds);
+        return teamRepository.findAllById(user.getTeamIds());
     }
 
     public User updateProfile(
@@ -185,19 +178,22 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
 
-        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
-            throw new RuntimeException("Mot de passe actuel incorrect");
+        // Vérification du mot de passe actuel seulement si l'utilisateur change le mot de passe
+        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+            if (currentPassword == null || currentPassword.isEmpty() ||
+                    !passwordEncoder.matches(currentPassword, user.getPassword())) {
+                throw new RuntimeException("Mot de passe actuel incorrect");
+            }
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
 
+        // Mise à jour des autres champs
         user.setFirstname(request.getFirstname());
         user.setLastname(request.getLastname());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
 
-        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
-        }
-
+        // Gestion de l'image
         if (image != null && !image.isEmpty()) {
             try {
                 String fileName = user.getId() + "_" + image.getOriginalFilename();
@@ -211,6 +207,7 @@ public class UserService {
                 throw new RuntimeException("Erreur lors de l'upload de l'image");
             }
         }
+
         return userRepository.save(user);
     }
 }

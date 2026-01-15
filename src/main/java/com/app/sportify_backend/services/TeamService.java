@@ -2,20 +2,16 @@ package com.app.sportify_backend.services;
 
 import com.app.sportify_backend.dto.TeamPlayerResponse;
 import com.app.sportify_backend.models.*;
-import com.app.sportify_backend.repositories.InvitationRepository;
-import com.app.sportify_backend.repositories.TeamMemberRepository;
 import com.app.sportify_backend.repositories.TeamRepository;
 import com.app.sportify_backend.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,7 +20,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TeamService {
     private final TeamRepository teamRepository;
-    private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
 
     public Team createTeam(Team team, MultipartFile image) throws IOException {
@@ -43,6 +38,7 @@ public class TeamService {
             team.setLogoUrl("/uploads/teams/" + filename);
             team = teamRepository.save(team);
         }
+        team.setTeamCode(generateUniqueTeamCode());
 
         return teamRepository.save(team);
     }
@@ -91,10 +87,12 @@ public class TeamService {
 
     public List<TeamPlayerResponse> getTeamPlayers(String teamId) {
 
-        List<TeamMember> members = teamMemberRepository.findByTeamId(teamId);
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("TEAM_NOT_FOUND"));
 
-        return members.stream().map(member -> {
-            var user = userRepository.findById(member.getUserId())
+        return team.getMembers().stream().map(member -> {
+
+            User user = userRepository.findById(member.getUserId())
                     .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
 
             return TeamPlayerResponse.builder()
@@ -104,9 +102,17 @@ public class TeamService {
                     .email(user.getEmail())
                     .profileImage(user.getProfileImageUrl())
                     .playerCode(user.getPlayerCode())
-                    .role(member.getRole().name())
+                    .role(member.getRole().name()) // OWNER / MEMBER
                     .build();
         }).toList();
+    }
+
+    private String generateUniqueTeamCode() {
+        String code;
+        do {
+            code = CodeGenerator.generateTeamCode();
+        } while (teamRepository.findByTeamCode(code).isPresent());
+        return code;
     }
 
     public void deleteTeam(String id) {

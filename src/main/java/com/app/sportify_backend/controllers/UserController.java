@@ -21,7 +21,7 @@ import java.util.Map;
 @AllArgsConstructor
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "*")
-public class AuthController {
+public class UserController {
 
     private final UserService userService;
     private final JwtService jwtService;
@@ -203,15 +203,20 @@ public class AuthController {
         UpdateProfileRequest request =
                 objectMapper.readValue(data, UpdateProfileRequest.class);
 
-        if (request.getCurrentPassword() == null || request.getCurrentPassword().isEmpty()) {
-            throw new RuntimeException("Le mot de passe actuel est requis");
+        // Vérification côté backend pour le mot de passe
+        if (request.getPassword() != null && !request.getPassword().isEmpty() &&
+                (request.getCurrentPassword() == null || request.getCurrentPassword().isEmpty())) {
+            throw new RuntimeException("Le mot de passe actuel est requis pour changer le mot de passe");
         }
 
-        User updatedUser = userService.updateProfile(id, request, request.getCurrentPassword(), image);
+        User updatedUser = userService.updateProfile(
+                id,
+                request,
+                request.getCurrentPassword(),
+                image
+        );
         updatedUser.setPassword(null);
 
         return ResponseEntity.ok(updatedUser);
     }
-
-
 }
