@@ -19,7 +19,6 @@ public class InvitationService {
     private final InvitationRepository invitationRepository;
     private final NotificationService notificationService;
 
-    // ---------------- Invite player ----------------
     public Invitation invitePlayer(String teamId, String senderId, String playerCode) {
 
         User receiver = userRepository.findByPlayerCode(playerCode)
@@ -55,7 +54,6 @@ public class InvitationService {
         return invitation;
     }
 
-    // ---------------- Accept invitation ----------------
     public void acceptInvitation(String invitationId, String userId) {
 
         Invitation invitation = invitationRepository.findById(invitationId)
@@ -63,6 +61,10 @@ public class InvitationService {
 
         if (!invitation.getReceiverId().equals(userId)) {
             throw new RuntimeException("NOT_ALLOWED");
+        }
+
+        if (invitation.getStatus() != InvitationStatus.PENDING) {
+            throw new RuntimeException("INVITATION_ALREADY_PROCESSED");
         }
 
         invitation.setStatus(InvitationStatus.ACCEPTED);
@@ -90,11 +92,10 @@ public class InvitationService {
                 "Invitation acceptée",
                 "Votre invitation a été acceptée par " + user.getFirstname(),
                 NotificationType.INVITATION_ACCEPTED,
-                invitation.getId()
+                team.getId()
         );
     }
 
-    // ---------------- Refuse invitation ----------------
     public void refuseInvitation(String invitationId, String userId) {
 
         Invitation invitation = invitationRepository.findById(invitationId)
@@ -111,16 +112,18 @@ public class InvitationService {
         invitation.setStatus(InvitationStatus.REJECTED);
         invitationRepository.save(invitation);
 
+        Team team = teamRepository.findById(invitation.getTeamId())
+                .orElseThrow(() -> new RuntimeException("TEAM_NOT_FOUND"));
+
         notificationService.send(
                 invitation.getSenderId(),
                 "Invitation refusée",
                 "Votre invitation a été refusée par " + userRepository.findById(userId).map(User::getFirstname).orElse("un joueur"),
                 NotificationType.INVITATION_REJECTED,
-                invitation.getId()
+                team.getId()
         );
     }
 
-    // ---------------- Get pending invitations ----------------
     public List<Invitation> getPendingInvitations(String userId) {
         return invitationRepository
                 .findByReceiverIdAndStatus(userId, InvitationStatus.PENDING);

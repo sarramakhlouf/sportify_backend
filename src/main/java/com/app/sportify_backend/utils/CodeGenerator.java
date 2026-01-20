@@ -1,4 +1,4 @@
-package com.app.sportify_backend.services;
+package com.app.sportify_backend.utils;
 
 import java.security.SecureRandom;
 

@@ -1,10 +1,14 @@
 package com.app.sportify_backend.services;
 
 import com.app.sportify_backend.dto.TeamPlayerResponse;
+import com.app.sportify_backend.dto.UpdateTeamRequest;
+import com.app.sportify_backend.dto.UserTeamsResponse;
 import com.app.sportify_backend.models.*;
+import com.app.sportify_backend.utils.CodeGenerator;
 import com.app.sportify_backend.repositories.TeamRepository;
 import com.app.sportify_backend.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -12,6 +16,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,7 +52,21 @@ public class TeamService {
         return teamRepository.findByOwnerId(ownerId);
     }
 
-    public Optional<Team> getTeamById(String id) {
+    public List<Team> getTeamsWhereUserIsMember(String userId) {
+        return teamRepository.findByMembersUserId(userId)
+                .stream()
+                .filter(team -> !team.getOwnerId().equals(userId))
+                .toList();
+    }
+
+    public UserTeamsResponse getUserTeams(String userId) {
+        return UserTeamsResponse.builder()
+                .ownedTeams(getTeamsByOwner(userId))
+                .memberTeams(getTeamsWhereUserIsMember(userId))
+                .build();
+    }
+
+    /*public Optional<Team> getTeamById(String id) {
         return teamRepository.findById(id);
     }
 
@@ -55,27 +74,65 @@ public class TeamService {
         return teamRepository.findById(id).map(team -> {
             team.setName(updatedTeam.getName());
             team.setCity(updatedTeam.getCity());
-            team.setColor(updatedTeam.getColor());
             team.setLogoUrl(updatedTeam.getLogoUrl());
-            team.setIsActivated(updatedTeam.getIsActivated());
+            //team.setIsActivated(updatedTeam.getIsActivated());
             return teamRepository.save(team);
         }).orElseThrow(() -> new RuntimeException("Team not found"));
+    }*/
+
+    public Team updateTeam(String teamId, UpdateTeamRequest request, MultipartFile image) {
+
+        System.out.println("NAME RECEIVED = " + request.getName());
+        System.out.println("CITY RECEIVED = " + request.getCity());
+
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("TEAM_NOT_FOUND"));
+
+        team.setName(request.getName());
+        team.setCity(request.getCity());
+
+        if (image != null && !image.isEmpty()) {
+            try {
+                String fileName = team.getId() + "_" + image.getOriginalFilename();
+                Path path = Paths.get("uploads/teams/" + fileName);
+
+                Files.createDirectories(path.getParent());
+                Files.write(path, image.getBytes());
+
+                team.setLogoUrl("/uploads/teams/" + fileName);
+            } catch (Exception e) {
+                throw new RuntimeException("Erreur lors de l'upload de l'image");
+            }
+        }
+
+        return teamRepository.save(team);
     }
 
-    public Team activateTeam(String teamId, String ownerId) {
-        List<Team> ownerTeams = teamRepository.findByOwnerId(ownerId);
+    public Team activateTeam(String teamId, String userId) {
+        Team teamToActivate = teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("Team not found"));
 
-        for (Team t : ownerTeams) {
-            if (t.getId().equals(teamId)) {
-                t.setIsActivated(true);
-            } else {
-                t.setIsActivated(false);
-            }
+        boolean isMemberOrOwner = teamToActivate.getOwnerId().equals(userId)
+                || teamToActivate.getMembers().stream()
+                .anyMatch(member -> member.getUserId().equals(userId));
+
+        if (!isMemberOrOwner) {
+            throw new RuntimeException("L'utilisateur n'est pas autorisé à activer cette équipe");
+        }
+
+        List<Team> allUserTeams = teamRepository.findByOwnerId(userId);
+        allUserTeams.addAll(teamRepository.findByMembersUserId(userId)
+                .stream()
+                .filter(t -> !allUserTeams.contains(t))
+                .toList());
+
+        for (Team t : allUserTeams) {
+            t.setIsActivated(false);
             teamRepository.save(t);
         }
 
-        return teamRepository.findById(teamId)
-                .orElseThrow(() -> new RuntimeException("Team not found"));
+        teamToActivate.setIsActivated(true);
+        return teamRepository.save(teamToActivate);
     }
 
     public Team deactivateTeam(String teamId) {
@@ -116,6 +173,31 @@ public class TeamService {
     }
 
     public void deleteTeam(String id) {
+        Team team = teamRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Team not found"));
+
+        List<String> userIds = new ArrayList<>();
+
+        userIds.add(team.getOwnerId());
+
+        team.getMembers().forEach(member -> {
+            if (!userIds.contains(member.getUserId())) {
+                userIds.add(member.getUserId());
+            }
+        });
+
+        userIds.forEach(userId -> {
+            userRepository.findById(userId).ifPresent(user -> {
+                user.getTeamIds().remove(id);
+                userRepository.save(user);
+            });
+        });
         teamRepository.deleteById(id);
     }
+
+    public Team getTeamById(String id) {
+        return teamRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Team not found"));
+    }
+
 }

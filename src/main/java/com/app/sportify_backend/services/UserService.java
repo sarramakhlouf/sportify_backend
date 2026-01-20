@@ -6,10 +6,12 @@ import com.app.sportify_backend.dto.UpdateProfileRequest;
 import com.app.sportify_backend.models.Role;
 import com.app.sportify_backend.models.Team;
 import com.app.sportify_backend.models.User;
+import com.app.sportify_backend.utils.CodeGenerator;
 import com.app.sportify_backend.repositories.TeamRepository;
 import com.app.sportify_backend.repositories.UserRepository;
 import com.app.sportify_backend.security.JwtService;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,9 +24,8 @@ import java.util.List;
 import java.util.Random;
 
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class UserService {
-
     private final UserRepository userRepository;
     private final TeamRepository teamRepository;
     private final PasswordEncoder passwordEncoder;

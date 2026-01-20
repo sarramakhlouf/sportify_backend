@@ -1,9 +1,12 @@
 package com.app.sportify_backend.models;
 
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,7 +22,6 @@ public class Team {
 
     private String name;
     private String city;
-    private String color;
     private String logoUrl;
     private Boolean isActivated = false;
 
@@ -27,6 +29,10 @@ public class Team {
     private String teamCode;
 
     private List<TeamMember> members = new ArrayList<>();
+
+    @CreatedDate
+    @Field("created_at")
+    private LocalDateTime createdAt;
 
     @Data
     @AllArgsConstructor

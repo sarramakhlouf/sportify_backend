@@ -1,9 +1,13 @@
 package com.app.sportify_backend.controllers;
 
 import com.app.sportify_backend.dto.TeamPlayerResponse;
+import com.app.sportify_backend.dto.UpdateTeamRequest;
+import com.app.sportify_backend.dto.UserTeamsResponse;
 import com.app.sportify_backend.models.Team;
 import com.app.sportify_backend.services.TeamService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
@@ -34,9 +38,29 @@ public class TeamController {
         return teamService.getTeamsByOwner(ownerId);
     }
 
-    @PutMapping("/{id}")
+    @GetMapping("/member/{userId}")
+    public List<Team> getTeamsWhereUserIsMember(@PathVariable String userId) {
+        return teamService.getTeamsWhereUserIsMember(userId);
+    }
+
+    @GetMapping("/user/{userId}")
+    public UserTeamsResponse getUserTeams(@PathVariable String userId) {
+        return teamService.getUserTeams(userId);
+    }
+
+    /*@PutMapping("/{id}")
     public Team updateTeam(@PathVariable String id, @RequestBody Team team) {
         return teamService.updateTeam(id, team);
+    }*/
+
+    @PostMapping(value = "/{id}/update", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Team updateTeam(
+            @PathVariable String id,
+            @RequestPart("data") UpdateTeamRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile image
+    ) {
+        System.out.println("CONTROLLER NAME = " + request.getName());
+        return teamService.updateTeam(id, request, image);
     }
 
     @PutMapping("/activate/{teamId}/owner/{ownerId}")
@@ -55,7 +79,13 @@ public class TeamController {
     }
 
     @DeleteMapping("/{id}")
-    public void deleteTeam(@PathVariable String id) {
+    public ResponseEntity<?> deleteTeam(@PathVariable String id) {
         teamService.deleteTeam(id);
+        return ResponseEntity.ok().body("Team deleted successfully");
+    }
+
+    @GetMapping("/{id}")
+    public Team getTeamById(@PathVariable String id) {
+        return teamService.getTeamById(id);
     }
 }

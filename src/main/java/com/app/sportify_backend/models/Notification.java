@@ -19,7 +19,7 @@ public class Notification {
     @Id
     private String id;
 
-    private String userId; // destinataire
+    private String userId;
 
     private String title;
     private String message;
@@ -28,7 +28,7 @@ public class Notification {
 
     private boolean isRead;
 
-    private String referenceId; // invitationId, teamId, matchId...
+    private String referenceId;
 
     private LocalDateTime createdAt;
 }
