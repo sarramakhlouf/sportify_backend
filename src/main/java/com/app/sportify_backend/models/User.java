@@ -30,6 +30,7 @@ public class User implements UserDetails {
     @Indexed(unique = true)
     private String email;
 
+    @Indexed(unique = true)
     private String phone;
 
     @JsonIgnore
@@ -85,4 +86,5 @@ public class User implements UserDetails {
     public boolean isEnabled() {
         return isEnabled;
     }
+
 }

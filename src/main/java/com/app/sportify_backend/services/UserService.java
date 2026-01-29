@@ -4,14 +4,12 @@ import com.app.sportify_backend.dto.ForgotPasswordRequest;
 import com.app.sportify_backend.dto.RegisterRequest;
 import com.app.sportify_backend.dto.UpdateProfileRequest;
 import com.app.sportify_backend.models.Role;
-import com.app.sportify_backend.models.Team;
 import com.app.sportify_backend.models.User;
 import com.app.sportify_backend.utils.CodeGenerator;
 import com.app.sportify_backend.repositories.TeamRepository;
 import com.app.sportify_backend.repositories.UserRepository;
 import com.app.sportify_backend.security.JwtService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,6 +34,10 @@ public class UserService {
 
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("EMAIL_ALREADY_EXISTS");
+        }
+
+        if (userRepository.existsByPhone(request.getPhone())) {
+            throw new RuntimeException("PHONE_ALREADY_EXISTS");
         }
 
         if (request.getPassword().length() < 8) {
@@ -80,10 +82,10 @@ public class UserService {
 
     public String loginUser(String email, String password) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
+                .orElseThrow(() -> new RuntimeException("Aucun compte trouvé avec cet email"));
 
         if(!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Email ou mot de passe incorrect");
+            throw new RuntimeException("Le mot de passe est incorrect");
         }
 
         if(user.getRole() == Role.MANAGER && !user.isEnabled()) {
@@ -150,7 +152,6 @@ public class UserService {
 
         if(user.getOtpExpiration().isBefore(LocalDateTime.now())) return false;
 
-        // Supprime OTP après validation
         user.setResetOtp(null);
         user.setOtpExpiration(null);
         userRepository.save(user);
@@ -165,13 +166,6 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public List<Team> getMyTeams(String userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
-
-        return teamRepository.findAllById(user.getTeamIds());
-    }
-
     public User updateProfile(
             String userId, UpdateProfileRequest request,
             String currentPassword, MultipartFile image) {
@@ -179,7 +173,11 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
 
-        // Vérification du mot de passe actuel seulement si l'utilisateur change le mot de passe
+        if (!user.getPhone().equals(request.getPhone()) &&
+                userRepository.existsByPhone(request.getPhone())) {
+            throw new RuntimeException("PHONE_ALREADY_EXISTS");
+        }
+
         if (request.getPassword() != null && !request.getPassword().isEmpty()) {
             if (currentPassword == null || currentPassword.isEmpty() ||
                     !passwordEncoder.matches(currentPassword, user.getPassword())) {
@@ -188,13 +186,11 @@ public class UserService {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
 
-        // Mise à jour des autres champs
         user.setFirstname(request.getFirstname());
         user.setLastname(request.getLastname());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
 
-        // Gestion de l'image
         if (image != null && !image.isEmpty()) {
             try {
                 String fileName = user.getId() + "_" + image.getOriginalFilename();

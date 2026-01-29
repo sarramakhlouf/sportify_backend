@@ -17,7 +17,6 @@ public class JwtService {
     private static final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(SECRET.getBytes());
     private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 24; // 24 heures
 
-    // Générer le token
     public String generateToken(User user) {
         return Jwts.builder()
                 .setSubject(user.getEmail())
@@ -27,7 +26,6 @@ public class JwtService {
                 .compact();
     }
 
-    // Extraire email depuis token
     public String extractEmail(String token) {
         try {
             Claims claims = Jwts.parser()
@@ -37,14 +35,12 @@ public class JwtService {
                     .getBody();
             return claims.getSubject();
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
-            // Token expiré, mais on peut récupérer l'email pour refresh
             return e.getClaims().getSubject();
         } catch (Exception e) {
             return null;
         }
     }
 
-    // Vérifier si le token est valide
     public boolean isTokenValid(String token) {
         try {
             Jwts.parser()

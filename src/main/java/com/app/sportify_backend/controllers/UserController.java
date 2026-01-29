@@ -33,42 +33,29 @@ public class UserController {
             @RequestPart("data") String data,
             @RequestPart(value = "image", required = false) MultipartFile image
     ) {
-        try {
+        RegisterRequest request = objectMapper.readValue(data, RegisterRequest.class);
 
-            // convertir le JSON en RegisterRequest
-            RegisterRequest request = objectMapper.readValue(data, RegisterRequest.class);
-
-            System.out.println("Register reçu: " + request.getEmail());
-            User user = userService.registerUser(request, image);
-            return ResponseEntity.status(HttpStatus.CREATED).body(
-                    Map.of(
-                            "message", "Inscription réussie",
-                            "user", user
-                    )
-            );
-        } catch (RuntimeException e) {
-            if ("EMAIL_ALREADY_EXISTS".equals(e.getMessage())) {
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(
-                        Map.of("error", "Cet email est déjà utilisé")
-                );
-            }
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                    Map.of("error", e.getMessage())
-            );
-        }
+        System.out.println("Register reçu: " + request.getEmail());
+        User user = userService.registerUser(request, image);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                Map.of(
+                        "message", "Inscription réussie",
+                        "user", user
+                )
+        );
     }
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request) {
         System.out.println("Login reçu pour: " + request.getEmail());
 
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
         String accessToken = userService.loginUser(
                 request.getEmail(),
                 request.getPassword()
         );
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         String refreshToken = jwtService.generateRefreshToken(user);
 

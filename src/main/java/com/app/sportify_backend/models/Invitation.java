@@ -16,11 +16,25 @@ public class Invitation {
     @Id
     private String id;
 
-    private String teamId;
+    //COMMUN
     private String senderId;
+    private String senderName;
     private String receiverId;
+    private String receiverName;
 
+    private InvitationType type;
     private InvitationStatus status;
 
+    //PLAYER_INVITATION
+    private String teamId;
+    private String teamName;
+
+    //TEAM_MATCH_INVITATION
+    private String senderTeamId;
+    private String senderTeamName;
+    private String receiverTeamId;
+    private String receiverTeamName;
+
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

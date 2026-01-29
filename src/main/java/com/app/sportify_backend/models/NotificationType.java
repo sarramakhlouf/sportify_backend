@@ -1,10 +1,14 @@
 package com.app.sportify_backend.models;
 
 public enum NotificationType {
-    INVITATION_RECEIVED,
     INVITATION_ACCEPTED,
     INVITATION_REJECTED,
-    INVITE_TEAM_TO_MATCH,
-    GENERAL,
+    TEAM_JOINED,
+    MATCH_CREATED,
+    MATCH_UPDATED,
+    MATCH_CANCELLED,
+    PLAYER_JOINED_MATCH,
+    TEAM_UPDATE
 }
+
 

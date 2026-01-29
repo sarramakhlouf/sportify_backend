@@ -8,6 +8,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Document(collection = "notifications")
 @Data
@@ -19,17 +20,19 @@ public class Notification {
     @Id
     private String id;
 
-    private String userId;
+    private String recipientId;
+    private String senderId;
 
+    private NotificationType type;
+    private NotificationStatus status;
     private String title;
     private String message;
 
-    private NotificationType type;
+    private Map<String, Object> data;
 
     private boolean isRead;
 
-    private String referenceId;
+    private String referenceId; // teamId / matchId / userId
 
     private LocalDateTime createdAt;
 }
-

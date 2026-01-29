@@ -1,5 +1,6 @@
-package com.app.sportify_backend.security;
+package com.app.sportify_backend.config;
 
+import com.app.sportify_backend.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -60,3 +61,4 @@ public class SecurityConfig {
         return http.build();
     }
 }
+

@@ -1,90 +1,149 @@
 package com.app.sportify_backend.services;
 
-import com.app.sportify_backend.dto.InvitationNotificationResponse;
-import com.app.sportify_backend.models.Invitation;
-import com.app.sportify_backend.models.Notification;
-import com.app.sportify_backend.models.NotificationType;
-import com.app.sportify_backend.models.Team;
-import com.app.sportify_backend.repositories.InvitationRepository;
+import com.app.sportify_backend.dto.NotificationResponse;
+import com.app.sportify_backend.models.*;
 import com.app.sportify_backend.repositories.NotificationRepository;
-import com.app.sportify_backend.repositories.TeamRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
-    private final InvitationRepository invitationRepository;
-    private final TeamRepository teamRepository;
-    private final SimpMessagingTemplate messagingTemplate;
 
-    public void send(
-            String userId,
+    /**
+     * Créer et envoyer une notification
+     */
+    public Notification send(
+            String recipientId,
+            String senderId,
             String title,
             String message,
             NotificationType type,
             String referenceId
     ) {
-        Notification notification = notificationRepository.save(
-                Notification.builder()
-                        .userId(userId)
-                        .title(title)
-                        .message(message)
-                        .type(type)
-                        .referenceId(referenceId)
-                        .isRead(false)
-                        .createdAt(LocalDateTime.now())
-                        .build()
-        );
+        return send(recipientId, senderId, title, message, type, referenceId, null);
+    }
 
-        // 🔴 PUSH temps réel
-        messagingTemplate.convertAndSendToUser(
+    /**
+     * Créer et envoyer une notification avec données additionnelles
+     */
+    public Notification send(
+            String recipientId,
+            String senderId,
+            String title,
+            String message,
+            NotificationType type,
+            String referenceId,
+            Map<String, Object> data
+    ) {
+        Notification notification = Notification.builder()
+                .recipientId(recipientId)
+                .senderId(senderId)
+                .title(title)
+                .message(message)
+                .type(type)
+                .status(NotificationStatus.UNREAD)
+                .referenceId(referenceId)
+                .data(data)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        return notificationRepository.save(notification);
+    }
+
+    /**
+     * Récupérer toutes les notifications d'un utilisateur
+     */
+    public List<NotificationResponse> getUserNotifications(String userId) {
+        return notificationRepository
+                .findByRecipientIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Récupérer les notifications non lues
+     */
+    public List<NotificationResponse> getUnreadNotifications(String userId) {
+        return notificationRepository
+                .findByRecipientIdAndStatus(userId, NotificationStatus.UNREAD)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Compter les notifications non lues
+     */
+    public long countUnread(String userId) {
+        return notificationRepository.countByRecipientIdAndStatus(
                 userId,
-                "/queue/notifications",
-                notification
+                NotificationStatus.UNREAD
         );
     }
 
-    public List<InvitationNotificationResponse> getInvitationNotifications(String userId) {
+    /**
+     * Marquer une notification comme lue
+     */
+    public void markAsRead(String notificationId, String userId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("NOTIFICATION_NOT_FOUND"));
 
-        List<Notification> notifications =
-                notificationRepository.findByUserIdAndType(
-                        userId,
-                        NotificationType.INVITATION_RECEIVED
-                );
+        if (!notification.getRecipientId().equals(userId)) {
+            throw new RuntimeException("NOT_ALLOWED");
+        }
 
-        return notifications.stream().map(notification -> {
-
-            Invitation invitation =
-                    invitationRepository.findById(notification.getReferenceId())
-                            .orElseThrow();
-
-            Team team =
-                    teamRepository.findById(invitation.getTeamId())
-                            .orElseThrow();
-
-            return InvitationNotificationResponse.builder()
-                    .notificationId(notification.getId())
-                    .invitationId(invitation.getId())
-                    .teamId(team.getId())
-                    .teamName(team.getName())
-                    .teamCity(team.getCity())
-                    .teamLogo(team.getLogoUrl())
-                    .title(notification.getTitle())
-                    .message(notification.getMessage())
-                    .isRead(notification.isRead())
-                    .createdAt(notification.getCreatedAt())
-                    .build();
-
-        }).toList();
+        notification.setStatus(NotificationStatus.READ);
+        notificationRepository.save(notification);
     }
 
+    /**
+     * Marquer toutes les notifications comme lues
+     */
+    public void markAllAsRead(String userId) {
+        List<Notification> unreadNotifications = notificationRepository
+                .findByRecipientIdAndStatus(userId, NotificationStatus.UNREAD);
+
+        unreadNotifications.forEach(n -> n.setStatus(NotificationStatus.READ));
+        notificationRepository.saveAll(unreadNotifications);
+    }
+
+    /**
+     * Supprimer une notification
+     */
+    public void deleteNotification(String notificationId, String userId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("NOTIFICATION_NOT_FOUND"));
+
+        if (!notification.getRecipientId().equals(userId)) {
+            throw new RuntimeException("NOT_ALLOWED");
+        }
+
+        notificationRepository.delete(notification);
+    }
+
+    /**
+     * Convertir Notification en NotificationResponse
+     */
+    private NotificationResponse toResponse(Notification notification) {
+        return NotificationResponse.builder()
+                .id(notification.getId())
+                .title(notification.getTitle())
+                .message(notification.getMessage())
+                .type(notification.getType())
+                .status(notification.getStatus())
+                .referenceId(notification.getReferenceId())
+                .data(notification.getData())
+                .createdAt(notification.getCreatedAt())
+                .build();
+    }
 }
-
-

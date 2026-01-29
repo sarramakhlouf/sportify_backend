@@ -1,4 +1,4 @@
-package com.app.sportify_backend.security;
+package com.app.sportify_backend.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
@@ -13,3 +13,4 @@ public class StaticResourceConfig implements WebMvcConfigurer {
                 .addResourceLocations("file:uploads/"); // dossier 'uploads' à la racine du projet
     }
 }
+
