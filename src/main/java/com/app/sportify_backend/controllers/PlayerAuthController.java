@@ -4,9 +4,9 @@ import com.app.sportify_backend.dto.LoginRequest;
 import com.app.sportify_backend.dto.RegisterRequest;
 import com.app.sportify_backend.dto.UpdateProfileRequest;
 import com.app.sportify_backend.models.User;
-import com.app.sportify_backend.repositories.UserRepository;
+import com.app.sportify_backend.repositories.PlayerAuthRepository;
 import com.app.sportify_backend.security.JwtService;
-import com.app.sportify_backend.services.UserService;
+import com.app.sportify_backend.services.PlayerAuthService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,11 +21,11 @@ import java.util.Map;
 @AllArgsConstructor
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "*")
-public class UserController {
+public class PlayerAuthController {
 
-    private final UserService userService;
+    private final PlayerAuthService playerAuthService;
     private final JwtService jwtService;
-    private final UserRepository userRepository;
+    private final PlayerAuthRepository playerAuthRepository;
     private final ObjectMapper objectMapper;
 
     @PostMapping( value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE )
@@ -36,7 +36,7 @@ public class UserController {
         RegisterRequest request = objectMapper.readValue(data, RegisterRequest.class);
 
         System.out.println("Register reçu: " + request.getEmail());
-        User user = userService.registerUser(request, image);
+        User user = playerAuthService.registerUser(request, image);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 Map.of(
                         "message", "Inscription réussie",
@@ -49,18 +49,18 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request) {
         System.out.println("Login reçu pour: " + request.getEmail());
 
-        String accessToken = userService.loginUser(
+        String accessToken = playerAuthService.loginUser(
                 request.getEmail(),
                 request.getPassword()
         );
 
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = playerAuthRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         String refreshToken = jwtService.generateRefreshToken(user);
 
         user.setRefreshToken(refreshToken);
-        userRepository.save(user);
+        playerAuthRepository.save(user);
 
         return ResponseEntity.ok(Map.of(
                 "accessToken", accessToken,
@@ -81,11 +81,11 @@ public class UserController {
         String token = authHeader.substring(7);
         String email = jwtService.extractEmail(token);
 
-        User user = userRepository.findByEmail(email)
+        User user = playerAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         user.setRefreshToken(null);
-        userRepository.save(user);
+        playerAuthRepository.save(user);
 
         return ResponseEntity.ok(
                 Map.of("message", "Déconnexion réussie")
@@ -100,7 +100,7 @@ public class UserController {
             throw new RuntimeException("Token manquant ou mal formaté");
         }
         String token = authHeader.substring(7);
-        User user = userService.autoLogin(token);
+        User user = playerAuthService.autoLogin(token);
 
         System.out.println("Utilisateur récupéré: " + user.getEmail());
         return ResponseEntity.ok(user);
@@ -108,7 +108,7 @@ public class UserController {
 
     @PostMapping("/verify/{userId}")
     public ResponseEntity<Map<String, Object>> verifyManager(@PathVariable String userId) {
-        User user = userService.verifyManager(userId);
+        User user = playerAuthService.verifyManager(userId);
         return ResponseEntity.ok(Map.of(
                 "message", "Manager vérifié",
                 "user", user
@@ -118,15 +118,15 @@ public class UserController {
     @PostMapping("/forgot-password/request-otp")
     public ResponseEntity<Map<String, String>> requestOtp(@RequestParam String email) {
         System.out.println("OTP demandé pour: " + email);
-        User user = userService.getUserByEmail(email);
-        userService.generateOtp(user);
+        User user = playerAuthService.getUserByEmail(email);
+        playerAuthService.generateOtp(user);
 
         return ResponseEntity.ok(Map.of("message", "OTP envoyé à l'email " + email));
     }
 
     @PostMapping("/forgot-password/verify-otp")
     public ResponseEntity<Map<String, String>> verifyOtp(@RequestParam String email, @RequestParam String otp) {
-        boolean valid = userService.verifyOtp(email, otp);
+        boolean valid = playerAuthService.verifyOtp(email, otp);
         if (!valid) {
             throw new RuntimeException("OTP invalide ou expiré");
         }
@@ -135,7 +135,7 @@ public class UserController {
 
     @PostMapping("/forgot-password/reset")
     public ResponseEntity<Map<String, String>> resetPassword(@RequestParam String email, @RequestParam String newPassword) {
-        userService.resetPassword(email, newPassword);
+        playerAuthService.resetPassword(email, newPassword);
         return ResponseEntity.ok(Map.of("message", "Mot de passe réinitialisé avec succès"));
     }
 
@@ -150,7 +150,7 @@ public class UserController {
         try {
             String email = jwtService.extractEmail(refreshToken);
 
-            User user = userRepository.findByEmail(email)
+            User user = playerAuthRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
             // Vérifier que le refresh token est valide
@@ -173,7 +173,7 @@ public class UserController {
 
     @GetMapping("/users/{id}")
     public User getUserById(@PathVariable String id) {
-        return userRepository.findById(id)
+        return playerAuthRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
     }
 
@@ -196,7 +196,7 @@ public class UserController {
             throw new RuntimeException("Le mot de passe actuel est requis pour changer le mot de passe");
         }
 
-        User updatedUser = userService.updateProfile(
+        User updatedUser = playerAuthService.updateProfile(
                 id,
                 request,
                 request.getCurrentPassword(),

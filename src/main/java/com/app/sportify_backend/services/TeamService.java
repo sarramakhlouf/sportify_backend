@@ -2,13 +2,12 @@ package com.app.sportify_backend.services;
 
 import com.app.sportify_backend.dto.TeamPlayerResponse;
 import com.app.sportify_backend.dto.UpdateTeamRequest;
-import com.app.sportify_backend.dto.UserTeamsResponse;
+import com.app.sportify_backend.dto.PlayerTeamsResponse;
 import com.app.sportify_backend.models.*;
 import com.app.sportify_backend.utils.CodeGenerator;
 import com.app.sportify_backend.repositories.TeamRepository;
-import com.app.sportify_backend.repositories.UserRepository;
+import com.app.sportify_backend.repositories.PlayerAuthRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,14 +17,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class TeamService {
     private final TeamRepository teamRepository;
-    private final UserRepository userRepository;
+    private final PlayerAuthRepository playerAuthRepository;
 
     public Team createTeam(Team team, MultipartFile image) throws IOException {
         team.setIsActivated(false);
@@ -59,8 +57,8 @@ public class TeamService {
                 .toList();
     }
 
-    public UserTeamsResponse getUserTeams(String userId) {
-        return UserTeamsResponse.builder()
+    public PlayerTeamsResponse getUserTeams(String userId) {
+        return PlayerTeamsResponse.builder()
                 .ownedTeams(getTeamsByOwner(userId))
                 .memberTeams(getTeamsWhereUserIsMember(userId))
                 .build();
@@ -149,7 +147,7 @@ public class TeamService {
 
         return team.getMembers().stream().map(member -> {
 
-            User user = userRepository.findById(member.getUserId())
+            User user = playerAuthRepository.findById(member.getUserId())
                     .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
 
             return TeamPlayerResponse.builder()
@@ -187,9 +185,9 @@ public class TeamService {
         });
 
         userIds.forEach(userId -> {
-            userRepository.findById(userId).ifPresent(user -> {
+            playerAuthRepository.findById(userId).ifPresent(user -> {
                 user.getTeamIds().remove(id);
-                userRepository.save(user);
+                playerAuthRepository.save(user);
             });
         });
         teamRepository.deleteById(id);
@@ -198,6 +196,11 @@ public class TeamService {
     public Team getTeamById(String id) {
         return teamRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Team not found"));
+    }
+
+    public Team getTeamByCode(String teamCode) {
+        return teamRepository.findByTeamCode(teamCode)
+                .orElseThrow(() -> new RuntimeException("Team not found with code: " + teamCode));
     }
 
 }

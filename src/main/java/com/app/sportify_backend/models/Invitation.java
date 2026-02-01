@@ -28,12 +28,21 @@ public class Invitation {
     //PLAYER_INVITATION
     private String teamId;
     private String teamName;
+    private String teamLogoUrl;
 
     //TEAM_MATCH_INVITATION
     private String senderTeamId;
     private String senderTeamName;
+    private String senderTeamLogoUrl;
     private String receiverTeamId;
     private String receiverTeamName;
+    private String receiverTeamLogoUrl;
+
+    @Builder.Default
+    private boolean deletedBySender = false;
+
+    @Builder.Default
+    private boolean deletedByReceiver = false;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

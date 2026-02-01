@@ -28,12 +28,15 @@ public class InvitationResponse {
     //PLAYER_INVITATION
     private String teamId;
     private String teamName;
+    private String teamLogoUrl;
 
     //TEAM_MATCH_INVITATION
     private String senderTeamId;
     private String senderTeamName;
+    private String senderTeamLogoUrl;
     private String receiverTeamId;
     private String receiverTeamName;
+    private String receiverTeamLogoUrl;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -52,12 +55,15 @@ public class InvitationResponse {
 
         if (invitation.getType() == InvitationType.PLAYER_INVITATION) {
             builder.teamId(invitation.getTeamId())
-                    .teamName(invitation.getTeamName());
+                    .teamName(invitation.getTeamName())
+                    .teamLogoUrl(invitation.getTeamLogoUrl());
         } else if (invitation.getType() == InvitationType.TEAM_MATCH_INVITATION) {
             builder.senderTeamId(invitation.getSenderTeamId())
                     .senderTeamName(invitation.getSenderTeamName())
+                    .senderTeamLogoUrl(invitation.getSenderTeamLogoUrl())
                     .receiverTeamId(invitation.getReceiverTeamId())
-                    .receiverTeamName(invitation.getReceiverTeamName());
+                    .receiverTeamName(invitation.getReceiverTeamName())
+                    .receiverTeamLogoUrl(invitation.getReceiverTeamLogoUrl());
         }
 
         return builder.build();

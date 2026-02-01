@@ -2,7 +2,7 @@ package com.app.sportify_backend.controllers;
 
 import com.app.sportify_backend.dto.TeamPlayerResponse;
 import com.app.sportify_backend.dto.UpdateTeamRequest;
-import com.app.sportify_backend.dto.UserTeamsResponse;
+import com.app.sportify_backend.dto.PlayerTeamsResponse;
 import com.app.sportify_backend.models.Team;
 import com.app.sportify_backend.services.TeamService;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +44,7 @@ public class TeamController {
     }
 
     @GetMapping("/user/{userId}")
-    public UserTeamsResponse getUserTeams(@PathVariable String userId) {
+    public PlayerTeamsResponse getUserTeams(@PathVariable String userId) {
         return teamService.getUserTeams(userId);
     }
 
@@ -87,5 +87,17 @@ public class TeamController {
     @GetMapping("/{id}")
     public Team getTeamById(@PathVariable String id) {
         return teamService.getTeamById(id);
+    }
+
+    @GetMapping("/code/{teamCode}")
+    public ResponseEntity<Team> getTeamByCode(@PathVariable String teamCode) {
+        try {
+            System.out.println("Recherche équipe avec code: " + teamCode);
+            Team team = teamService.getTeamByCode(teamCode);
+            return ResponseEntity.ok(team);
+        } catch (RuntimeException e) {
+            System.out.println("Erreur: " + e.getMessage());
+            return ResponseEntity.notFound().build();
+        }
     }
 }

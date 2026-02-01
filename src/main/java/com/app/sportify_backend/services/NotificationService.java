@@ -32,9 +32,7 @@ public class NotificationService {
         return send(recipientId, senderId, title, message, type, referenceId, null);
     }
 
-    /**
-     * Créer et envoyer une notification avec données additionnelles
-     */
+
     public Notification send(
             String recipientId,
             String senderId,
@@ -59,9 +57,6 @@ public class NotificationService {
         return notificationRepository.save(notification);
     }
 
-    /**
-     * Récupérer toutes les notifications d'un utilisateur
-     */
     public List<NotificationResponse> getUserNotifications(String userId) {
         return notificationRepository
                 .findByRecipientIdOrderByCreatedAtDesc(userId)
@@ -70,9 +65,7 @@ public class NotificationService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Récupérer les notifications non lues
-     */
+
     public List<NotificationResponse> getUnreadNotifications(String userId) {
         return notificationRepository
                 .findByRecipientIdAndStatus(userId, NotificationStatus.UNREAD)
@@ -81,9 +74,6 @@ public class NotificationService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Compter les notifications non lues
-     */
     public long countUnread(String userId) {
         return notificationRepository.countByRecipientIdAndStatus(
                 userId,
@@ -91,9 +81,7 @@ public class NotificationService {
         );
     }
 
-    /**
-     * Marquer une notification comme lue
-     */
+
     public void markAsRead(String notificationId, String userId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new RuntimeException("NOTIFICATION_NOT_FOUND"));
@@ -106,9 +94,6 @@ public class NotificationService {
         notificationRepository.save(notification);
     }
 
-    /**
-     * Marquer toutes les notifications comme lues
-     */
     public void markAllAsRead(String userId) {
         List<Notification> unreadNotifications = notificationRepository
                 .findByRecipientIdAndStatus(userId, NotificationStatus.UNREAD);
@@ -117,9 +102,7 @@ public class NotificationService {
         notificationRepository.saveAll(unreadNotifications);
     }
 
-    /**
-     * Supprimer une notification
-     */
+
     public void deleteNotification(String notificationId, String userId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new RuntimeException("NOTIFICATION_NOT_FOUND"));
@@ -131,9 +114,7 @@ public class NotificationService {
         notificationRepository.delete(notification);
     }
 
-    /**
-     * Convertir Notification en NotificationResponse
-     */
+
     private NotificationResponse toResponse(Notification notification) {
         return NotificationResponse.builder()
                 .id(notification.getId())

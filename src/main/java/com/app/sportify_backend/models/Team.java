@@ -40,6 +40,8 @@ public class Team {
     @Builder
     public static class TeamMember {
         private String userId;
+        private String userFirstName;
+        private String userLastName;
         private MemberRole role;
     }
 }

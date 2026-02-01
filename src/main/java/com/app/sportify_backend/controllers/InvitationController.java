@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -71,7 +72,7 @@ public class InvitationController {
     }
 
     //----------------REFUSE INVITATION------------------------------------------------------
-    @PostMapping("/{id}/reject")
+    @PostMapping("/{id}/refuse")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, String>> refuseInvitation(
             @PathVariable String id,
@@ -98,12 +99,12 @@ public class InvitationController {
         invitationService.cancelInvitation(id, user.getId());
     }
 
-    //----------------GET PENDING INVITATIONS-----------------------------------------------------------
-    @GetMapping("/pending")
+    //----------------GET PENDING PLAYER INVITATIONS-----------------------------------------------------------
+    @GetMapping("/pending/player")
     @PreAuthorize("isAuthenticated()")
-    public List<InvitationResponse> getPendingInvitations(Authentication authentication) {
+    public List<InvitationResponse> getPendingPlayerInvitations(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
-        return invitationService.getPendingInvitations(user.getId());
+        return invitationService.getPendingPlayerInvitations(user.getId());
     }
 
     //-----------------------------GET MATCH INVITATIONS----------------------------------------------
@@ -113,6 +114,27 @@ public class InvitationController {
     ) {
         User user = (User) authentication.getPrincipal();
         return invitationService.getTeamMatchInvitations(user.getId());
+    }
+
+    //----------------------------------DELETE ALL TEAM MATCH INVITATIONS-----------------------------------------------
+    @DeleteMapping("/team-match/delete/all")
+    public ResponseEntity<Map<String, String>> deleteAllTeamMatchInvitations(Authentication authentication
+    ) {
+        try {
+            User user = (User) authentication.getPrincipal();
+
+            invitationService.deleteAllTeamMatchInvitations(user.getId());
+
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Toutes les invitations de match ont été supprimées");
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
     }
 
 }

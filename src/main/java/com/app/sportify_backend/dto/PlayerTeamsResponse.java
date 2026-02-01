@@ -8,7 +8,7 @@ import java.util.List;
 
 @Data
 @Builder
-public class UserTeamsResponse {
+public class PlayerTeamsResponse {
     private List<Team> ownedTeams;
     private List<Team> memberTeams;
 }

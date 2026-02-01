@@ -4,7 +4,7 @@ import com.app.sportify_backend.dto.InvitationResponse;
 import com.app.sportify_backend.models.*;
 import com.app.sportify_backend.repositories.InvitationRepository;
 import com.app.sportify_backend.repositories.TeamRepository;
-import com.app.sportify_backend.repositories.UserRepository;
+import com.app.sportify_backend.repositories.PlayerAuthRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class InvitationService {
 
-    private final UserRepository userRepository;
+    private final PlayerAuthRepository playerAuthRepository;
     private final TeamRepository teamRepository;
     private final InvitationRepository invitationRepository;
     private final NotificationService notificationService;
@@ -29,7 +29,7 @@ public class InvitationService {
     @Transactional
     public InvitationResponse invitePlayer(String teamId, String senderId, String playerCode) {
 
-        User receiver = userRepository.findByPlayerCode(playerCode)
+        User receiver = playerAuthRepository.findByPlayerCode(playerCode)
                 .orElseThrow(() -> new RuntimeException("PLAYER_NOT_FOUND"));
 
         Team team = teamRepository.findById(teamId)
@@ -64,6 +64,8 @@ public class InvitationService {
         Invitation invitation = invitationRepository.save(
                 Invitation.builder()
                         .teamId(teamId)
+                        .teamName(team.getName())
+                        .teamLogoUrl(team.getLogoUrl())
                         .senderId(senderId)
                         .receiverId(receiver.getId())
                         .type(InvitationType.PLAYER_INVITATION)
@@ -114,8 +116,10 @@ public class InvitationService {
                 .receiverId(receiverTeam.getOwnerId())
                 .senderTeamId(senderTeamId)
                 .senderTeamName(senderTeam.getName())
+                .senderTeamLogoUrl(senderTeam.getLogoUrl())
                 .receiverTeamId(receiverTeam.getId())
                 .receiverTeamName(receiverTeam.getName())
+                .receiverTeamLogoUrl(receiverTeam.getLogoUrl())
                 .type(InvitationType.TEAM_MATCH_INVITATION)
                 .status(InvitationStatus.PENDING)
                 .createdAt(LocalDateTime.now())
@@ -187,21 +191,22 @@ public class InvitationService {
             teamRepository.save(team);
         }
 
-        User user = userRepository.findById(userId)
+        User user = playerAuthRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
 
         if (!user.getTeamIds().contains(team.getId())) {
             user.getTeamIds().add(team.getId());
-            userRepository.save(user);
+            playerAuthRepository.save(user);
         }
 
         Map<String, Object> data = new HashMap<>();
         data.put("teamId", team.getId());
         data.put("teamName", team.getName());
+        data.put("teamLogo", team.getLogoUrl());
 
         notificationService.send(
-                userId,
                 invitation.getSenderId(),
+                userId,
                 "Invitation acceptée",
                 user.getFirstname() + " " + user.getLastname() + " a rejoint l'équipe " + team.getName(),
                 NotificationType.INVITATION_ACCEPTED,
@@ -221,12 +226,14 @@ public class InvitationService {
 
         Map<String, Object> data = new HashMap<>();
         data.put("senderTeamId", invitation.getSenderTeamId());
+        data.put("senderTeamLogo", senderTeam.getLogoUrl());
         data.put("receiverTeamId", invitation.getReceiverTeamId());
         data.put("receiverTeamName", receiverTeam.getName());
+        data.put("receiverTeamLogo", receiverTeam.getLogoUrl());
 
         notificationService.send(
-                receiverTeam.getOwnerId(),
                 invitation.getSenderId(),
+                receiverTeam.getOwnerId(),
                 "Invitation acceptée",
                 receiverTeam.getName() + " a accepté votre invitation de match",
                 NotificationType.INVITATION_ACCEPTED,
@@ -256,7 +263,7 @@ public class InvitationService {
             invitation.setUpdatedAt(LocalDateTime.now());
             invitationRepository.save(invitation);
 
-            User user = userRepository.findById(userId)
+            User user = playerAuthRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
 
             Team team = teamRepository.findById(invitation.getTeamId())
@@ -265,6 +272,7 @@ public class InvitationService {
             Map<String, Object> data = new HashMap<>();
             data.put("teamId", team.getId());
             data.put("teamName", team.getName());
+            data.put("teamLogo", team.getLogoUrl());
 
             notificationService.send(
                     userId,
@@ -297,8 +305,10 @@ public class InvitationService {
 
             Map<String, Object> data = new HashMap<>();
             data.put("senderTeamId", invitation.getSenderTeamId());
+            data.put("senderTeamLogo", senderTeam.getLogoUrl());
             data.put("receiverTeamId", receiverTeam.getId());
             data.put("receiverTeamName", receiverTeam.getName());
+            data.put("receiverTeamLogo", receiverTeam.getLogoUrl());
 
             notificationService.send(
                     receiverTeam.getOwnerId(),
@@ -332,8 +342,8 @@ public class InvitationService {
         invitationRepository.save(invitation);
     }
 
-    //-----------------GET PENDING INVITATIONS--------------------------------------------------------------------------
-    public List<InvitationResponse> getPendingInvitations(String userId) {
+    //-----------------GET PENDING PLAYER INVITATIONS--------------------------------------------------------------------------
+    public List<InvitationResponse> getPendingPlayerInvitations(String userId) {
 
         List<Invitation> invitations = new ArrayList<>();
 
@@ -345,18 +355,6 @@ public class InvitationService {
                 )
         );
 
-        List<Team> ownedTeams = teamRepository.findByOwnerId(userId);
-
-        for (Team team : ownedTeams) {
-            invitations.addAll(
-                    invitationRepository.findByTypeAndReceiverTeamIdAndStatus(
-                            InvitationType.TEAM_MATCH_INVITATION,
-                            team.getId(),
-                            InvitationStatus.PENDING
-                    )
-            );
-        }
-
         return invitations.stream()
                 .map(InvitationResponse::from)
                 .collect(Collectors.toList());
@@ -365,20 +363,32 @@ public class InvitationService {
     public List<InvitationResponse> getTeamMatchInvitations(String userId) {
 
         List<Team> ownedTeams = teamRepository.findByOwnerId(userId);
+        List<Invitation> invitations = new ArrayList<>();
 
-        if (ownedTeams.isEmpty()) {
-            return List.of();
-        }
+        invitations.addAll(
+                invitationRepository.findByTypeAndSenderIdAndDeletedBySenderFalse(
+                        InvitationType.TEAM_MATCH_INVITATION,
+                        userId
+                )
+        );
 
-        List<Invitation> invitations = invitationRepository.findByTypeAndSenderIdOrReceiverId(
-                InvitationType.TEAM_MATCH_INVITATION,
-                userId,
-                userId
+        invitations.addAll(
+                invitationRepository.findByTypeAndReceiverIdAndDeletedByReceiverFalse(
+                        InvitationType.TEAM_MATCH_INVITATION,
+                        userId
+                )
         );
 
         for (Team team : ownedTeams) {
             invitations.addAll(
-                    invitationRepository.findByTypeAndReceiverTeamId(
+                    invitationRepository.findByTypeAndReceiverTeamIdAndDeletedByReceiverFalse(
+                            InvitationType.TEAM_MATCH_INVITATION,
+                            team.getId()
+                    )
+            );
+
+            invitations.addAll(
+                    invitationRepository.findByTypeAndSenderTeamIdAndDeletedBySenderFalse(
                             InvitationType.TEAM_MATCH_INVITATION,
                             team.getId()
                     )
@@ -395,5 +405,44 @@ public class InvitationService {
         return invitationsUniques.values().stream()
                 .map(InvitationResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    //----------------------------------SOFT DELETE ALL TEAM MATCH INVITATIONS------------------------------------------
+    @Transactional
+    public void deleteAllTeamMatchInvitations(String userId) {
+
+        List<Team> ownedTeams = teamRepository.findByOwnerId(userId);
+
+        List<Invitation> invitationsToUpdate = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+
+        List<Invitation> sentInvitations = invitationRepository.findByTypeAndSenderIdAndDeletedBySenderFalse(
+                InvitationType.TEAM_MATCH_INVITATION,
+                userId
+        );
+
+        for (Invitation inv : sentInvitations) {
+            inv.setDeletedBySender(true);
+            invitationsToUpdate.add(inv);
+        }
+
+        List<Invitation> receivedInvitations = invitationRepository.findByTypeAndReceiverIdAndDeletedByReceiverFalse(
+                InvitationType.TEAM_MATCH_INVITATION,
+                userId
+        );
+
+        for (Invitation inv : receivedInvitations) {
+            inv.setDeletedByReceiver(true);
+            invitationsToUpdate.add(inv);
+        }
+        Map<String, Invitation> invitationsUniques = invitationsToUpdate.stream()
+                .collect(Collectors.toMap(
+                        Invitation::getId,
+                        inv -> inv,
+                        (existing, replacement) -> replacement // garder la dernière version
+                ));
+        invitationRepository.saveAll(invitationsUniques.values());
+
+        System.out.println(invitationsUniques.size() + " invitations de match marquées comme supprimées pour l'utilisateur " + userId);
     }
 }
