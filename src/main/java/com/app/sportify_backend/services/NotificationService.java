@@ -57,6 +57,52 @@ public class NotificationService {
         return notificationRepository.save(notification);
     }
 
+    public void sendInvitationCancelledNotification(
+            Invitation invitation,
+            String cancelledByUserId,
+            CancelReason reason,
+            String customMessage
+    ) {
+
+        boolean cancelledBySender = invitation.getSenderId().equals(cancelledByUserId);
+
+        String reasonText = switch (reason) {
+            case NO_PLAYERS -> "manque de joueurs";
+            case PITCH_NOT_AVAILABLE -> "terrain non disponible";
+            case BAD_WEATHER -> "mauvaises conditions météo";
+            case OTHERS -> customMessage != null ? customMessage : "autre raison";
+        };
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("invitationId", invitation.getId());
+        data.put("reason", reason.name());
+        data.put("reasonText", reasonText);
+
+        if (cancelledBySender) {
+            send(
+                    invitation.getReceiverId(),
+                    cancelledByUserId,
+                    "Invitation annulée",
+                    "L'invitation de l'équipe " + invitation.getSenderTeamName()
+                            + " a été annulée à cause de " + reasonText,
+                    NotificationType.MATCH_CANCELLED,
+                    invitation.getId(),
+                    data
+            );
+        } else {
+            send(
+                    invitation.getSenderId(),
+                    cancelledByUserId,
+                    "Invitation annulée",
+                    "L'équipe " + invitation.getReceiverTeamName()
+                            + " a annulé l'invitation à cause de " + reasonText,
+                    NotificationType.MATCH_CANCELLED,
+                    invitation.getId(),
+                    data
+            );
+        }
+    }
+
     public List<NotificationResponse> getUserNotifications(String userId) {
         return notificationRepository
                 .findByRecipientIdOrderByCreatedAtDesc(userId)

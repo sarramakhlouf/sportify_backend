@@ -6,7 +6,7 @@ import com.app.sportify_backend.dto.PlayerTeamsResponse;
 import com.app.sportify_backend.models.*;
 import com.app.sportify_backend.utils.CodeGenerator;
 import com.app.sportify_backend.repositories.TeamRepository;
-import com.app.sportify_backend.repositories.PlayerAuthRepository;
+import com.app.sportify_backend.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,7 +23,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TeamService {
     private final TeamRepository teamRepository;
-    private final PlayerAuthRepository playerAuthRepository;
+    private final UserRepository userRepository;
 
     public Team createTeam(Team team, MultipartFile image) throws IOException {
         team.setIsActivated(false);
@@ -147,7 +147,7 @@ public class TeamService {
 
         return team.getMembers().stream().map(member -> {
 
-            User user = playerAuthRepository.findById(member.getUserId())
+            User user = userRepository.findById(member.getUserId())
                     .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
 
             return TeamPlayerResponse.builder()
@@ -185,9 +185,9 @@ public class TeamService {
         });
 
         userIds.forEach(userId -> {
-            playerAuthRepository.findById(userId).ifPresent(user -> {
+            userRepository.findById(userId).ifPresent(user -> {
                 user.getTeamIds().remove(id);
-                playerAuthRepository.save(user);
+                userRepository.save(user);
             });
         });
         teamRepository.deleteById(id);

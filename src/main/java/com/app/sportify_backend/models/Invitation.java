@@ -39,10 +39,12 @@ public class Invitation {
     private String receiverTeamLogoUrl;
 
     @Builder.Default
-    private boolean deletedBySender = false;
+    private boolean cancelledBySender = false;
 
     @Builder.Default
-    private boolean deletedByReceiver = false;
+    private boolean cancelledByReceiver = false;
+
+    private CancelReason cancelReason;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

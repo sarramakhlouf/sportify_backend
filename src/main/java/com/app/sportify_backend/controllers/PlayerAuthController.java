@@ -4,7 +4,7 @@ import com.app.sportify_backend.dto.LoginRequest;
 import com.app.sportify_backend.dto.RegisterRequest;
 import com.app.sportify_backend.dto.UpdateProfileRequest;
 import com.app.sportify_backend.models.User;
-import com.app.sportify_backend.repositories.PlayerAuthRepository;
+import com.app.sportify_backend.repositories.UserRepository;
 import com.app.sportify_backend.security.JwtService;
 import com.app.sportify_backend.services.PlayerAuthService;
 import lombok.AllArgsConstructor;
@@ -25,7 +25,7 @@ public class PlayerAuthController {
 
     private final PlayerAuthService playerAuthService;
     private final JwtService jwtService;
-    private final PlayerAuthRepository playerAuthRepository;
+    private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
     @PostMapping( value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE )
@@ -54,13 +54,13 @@ public class PlayerAuthController {
                 request.getPassword()
         );
 
-        User user = playerAuthRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         String refreshToken = jwtService.generateRefreshToken(user);
 
         user.setRefreshToken(refreshToken);
-        playerAuthRepository.save(user);
+        userRepository.save(user);
 
         return ResponseEntity.ok(Map.of(
                 "accessToken", accessToken,
@@ -81,11 +81,11 @@ public class PlayerAuthController {
         String token = authHeader.substring(7);
         String email = jwtService.extractEmail(token);
 
-        User user = playerAuthRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         user.setRefreshToken(null);
-        playerAuthRepository.save(user);
+        userRepository.save(user);
 
         return ResponseEntity.ok(
                 Map.of("message", "Déconnexion réussie")
@@ -150,7 +150,7 @@ public class PlayerAuthController {
         try {
             String email = jwtService.extractEmail(refreshToken);
 
-            User user = playerAuthRepository.findByEmail(email)
+            User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
             // Vérifier que le refresh token est valide
@@ -173,7 +173,7 @@ public class PlayerAuthController {
 
     @GetMapping("/users/{id}")
     public User getUserById(@PathVariable String id) {
-        return playerAuthRepository.findById(id)
+        return userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
     }
 

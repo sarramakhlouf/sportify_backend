@@ -58,22 +58,22 @@ public interface InvitationRepository extends MongoRepository<Invitation, String
             String receiverId
     );
 
-    List<Invitation> findByTypeAndSenderIdAndDeletedBySenderFalse(
+    List<Invitation> findByTypeAndSenderIdAndCancelledBySenderFalse(
             InvitationType type,
             String senderId
     );
 
-    List<Invitation> findByTypeAndReceiverIdAndDeletedByReceiverFalse(
+    List<Invitation> findByTypeAndReceiverIdAndCancelledByReceiverFalse(
             InvitationType type,
             String receiverId
     );
 
-    List<Invitation> findByTypeAndReceiverTeamIdAndDeletedByReceiverFalse(
+    List<Invitation> findByTypeAndReceiverTeamIdAndCancelledByReceiverFalse(
             InvitationType type,
             String receiverTeamId
     );
 
-    List<Invitation> findByTypeAndSenderTeamIdAndDeletedBySenderFalse(
+    List<Invitation> findByTypeAndSenderTeamIdAndCancelledBySenderFalse(
             InvitationType type,
             String senderTeamId
     );

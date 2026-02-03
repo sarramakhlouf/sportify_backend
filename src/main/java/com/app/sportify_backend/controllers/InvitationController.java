@@ -1,5 +1,6 @@
 package com.app.sportify_backend.controllers;
 
+import com.app.sportify_backend.dto.CancelInvitationRequest;
 import com.app.sportify_backend.dto.InvitationResponse;
 import com.app.sportify_backend.dto.InvitePlayerRequest;
 import com.app.sportify_backend.dto.InviteTeamRequest;
@@ -89,14 +90,23 @@ public class InvitationController {
 
     //---------------CANCEL INVITATION-------------------------------------------------------
     @PostMapping("/{id}/cancel")
-    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("isAuthenticated()")
-    public void cancelInvitation(
+    public ResponseEntity<?> cancelInvitation(
             @PathVariable String id,
+            @RequestBody CancelInvitationRequest request,
             Authentication authentication
     ) {
         User user = (User) authentication.getPrincipal();
-        invitationService.cancelInvitation(id, user.getId());
+        invitationService.cancelInvitation(
+                id,
+                user.getId(),
+                request.getReason(),
+                request.getMessage()
+        );
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Invitation cancelled successfully"
+        ));
     }
 
     //----------------GET PENDING PLAYER INVITATIONS-----------------------------------------------------------
@@ -116,25 +126,5 @@ public class InvitationController {
         return invitationService.getTeamMatchInvitations(user.getId());
     }
 
-    //----------------------------------DELETE ALL TEAM MATCH INVITATIONS-----------------------------------------------
-    @DeleteMapping("/team-match/delete/all")
-    public ResponseEntity<Map<String, String>> deleteAllTeamMatchInvitations(Authentication authentication
-    ) {
-        try {
-            User user = (User) authentication.getPrincipal();
-
-            invitationService.deleteAllTeamMatchInvitations(user.getId());
-
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Toutes les invitations de match ont été supprimées");
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(error);
-        }
-    }
 
 }

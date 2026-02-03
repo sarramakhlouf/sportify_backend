@@ -1,6 +1,7 @@
 package com.app.sportify_backend.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.Id;
@@ -42,7 +43,10 @@ public class User implements UserDetails {
     private String playerCode;
 
     private boolean isEnabled = true;
+
     private LocalDateTime registrationDate;
+    private LocalDateTime activationDate;
+
     private String profileImageUrl;
     private String resetOtp;
     private LocalDateTime otpExpiration;
@@ -52,9 +56,17 @@ public class User implements UserDetails {
 
     private List<String> teamIds = new ArrayList<>();
 
+    @JsonIgnore
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Pitch pendingPitch;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String pitchId;
+
     @Override
     @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
+
         return Collections.emptyList();
     }
 

@@ -3,6 +3,7 @@ package com.app.sportify_backend.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -11,6 +12,33 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(AccountNotEnabledException.class)
+    public ResponseEntity<Map<String, String>> handleAccountNotEnabledException(AccountNotEnabledException ex) {
+        System.out.println("AccountNotEnabledException capturée: " + ex.getMessage());
+
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "ACCOUNT_NOT_ENABLED");
+        error.put("message", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(error);
+    }
+
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, String>> handleBadCredentialsException(BadCredentialsException ex) {
+        System.out.println("BadCredentialsException capturée: " + ex.getMessage());
+
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "INVALID_CREDENTIALS");
+        error.put("message", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(error);
+    }
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> handleRuntimeException(RuntimeException ex) {
