@@ -14,5 +14,6 @@ public interface MatchRepository extends MongoRepository<Match, String> {
     List<Match> findBySenderTeamIdOrReceiverTeamId(String senderTeamId, String receiverTeamId);
     List<Match> findByPitchIdAndMatchDate(String pitchId, LocalDate matchDate);
     List<Match> findByStatus(MatchStatus status);
+    List<Match> findByMatchDate(LocalDate matchDate);
     List<Match> findByCreatedBy(String createdBy);
 }

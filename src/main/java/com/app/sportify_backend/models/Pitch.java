@@ -30,7 +30,7 @@ public class Pitch {
     private String createdBy;
     private boolean createdViaValidation = false;
     private boolean createdViaBackoffice = false;
-    private boolean isActive = false;
+    private boolean isActive = true;
 
     private LocalDateTime createdAt;
 

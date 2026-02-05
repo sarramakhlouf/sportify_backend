@@ -15,13 +15,22 @@ public class Match {
     private String id;
     private String senderTeamId;
     private String senderTeamName;
+    private String senderTeamLogoUrl;
     private String receiverTeamId;
     private String receiverTeamName;
+    private String receiverTeamLogoUrl;
     private String pitchId;
     private LocalDate matchDate;
     private LocalTime matchTime;
     private MatchStatus status;
+    private Score score;
     private String createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    @Data
+    public static class Score {
+        private Integer home;
+        private Integer away;
+    }
 }

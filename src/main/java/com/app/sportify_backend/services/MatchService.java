@@ -3,6 +3,7 @@ package com.app.sportify_backend.services;
 import com.app.sportify_backend.dto.CreateMatchRequest;
 import com.app.sportify_backend.dto.MatchResponse;
 import com.app.sportify_backend.dto.PitchDTO;
+import com.app.sportify_backend.dto.UpdateScoreRequest;
 import com.app.sportify_backend.models.Match;
 import com.app.sportify_backend.models.MatchStatus;
 import com.app.sportify_backend.models.Pitch;
@@ -57,12 +58,15 @@ public class MatchService {
         Match match = new Match();
         match.setSenderTeamId(request.getSenderTeamId());
         match.setSenderTeamName(request.getSenderTeamName());
+        match.setSenderTeamLogoUrl(request.getSenderTeamLogoUrl());
         match.setReceiverTeamId(request.getReceiverTeamId());
         match.setReceiverTeamName(request.getReceiverTeamName());
+        match.setReceiverTeamLogoUrl(request.getReceiverTeamLogoUrl());
         match.setPitchId(request.getPitchId());
         match.setMatchDate(request.getMatchDate());
         match.setMatchTime(request.getMatchTime());
         match.setStatus(MatchStatus.PLANNED);
+        match.setScore(null); // Score null lors de la création
         match.setCreatedBy(userId);
         match.setCreatedAt(LocalDateTime.now());
         match.setUpdatedAt(LocalDateTime.now());
@@ -75,6 +79,42 @@ public class MatchService {
                 savedMatch.getMatchTime());
 
         return convertToResponse(savedMatch, pitch);
+    }
+
+    public MatchResponse updateMatchScore(String matchId, UpdateScoreRequest request, String userId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Match non trouvé"));
+
+        // Validation: le match doit être confirmé ou terminé pour ajouter un score
+        if (match.getStatus() == MatchStatus.CANCELLED) {
+            throw new RuntimeException("Impossible d'ajouter un score à un match annulé");
+        }
+
+        // Validation des scores (pas de scores négatifs)
+        if (request.getHomeScore() < 0 || request.getAwayScore() < 0) {
+            throw new RuntimeException("Les scores ne peuvent pas être négatifs");
+        }
+
+        // Créer le sous-document Score
+        Match.Score score = new Match.Score();
+        score.setHome(request.getHomeScore());
+        score.setAway(request.getAwayScore());
+
+        match.setScore(score);
+
+        // Optionnel: changer le statut du match en FINISHED
+        if (match.getStatus() != MatchStatus.COMPLETED) {
+            match.setStatus(MatchStatus.COMPLETED);
+        }
+
+        match.setUpdatedAt(LocalDateTime.now());
+        Match updatedMatch = matchRepository.save(match);
+
+        log.info("Score du match {} mis à jour: {} - {}",
+                matchId, request.getHomeScore(), request.getAwayScore());
+
+        Pitch pitch = pitchRepository.findById(match.getPitchId()).orElse(null);
+        return convertToResponse(updatedMatch, pitch);
     }
 
     public List<MatchResponse> getTeamMatches(String teamId) {
@@ -118,8 +158,7 @@ public class MatchService {
     }
 
     public MatchResponse confirmMatch(String matchId, String userId) {
-        updateMatchStatus(matchId, MatchStatus.CONFIRMED, userId);
-        return null;
+        return updateMatchStatus(matchId, MatchStatus.CONFIRMED, userId);
     }
 
     public List<MatchResponse> getMatchesByStatus(MatchStatus status) {
@@ -139,12 +178,19 @@ public class MatchService {
         response.setId(match.getId());
         response.setSenderTeamId(match.getSenderTeamId());
         response.setSenderTeamName(match.getSenderTeamName());
+        response.setSenderTeamLogoUrl(match.getSenderTeamLogoUrl());
         response.setReceiverTeamId(match.getReceiverTeamId());
         response.setReceiverTeamName(match.getReceiverTeamName());
+        response.setReceiverTeamLogoUrl(match.getReceiverTeamLogoUrl());
         response.setMatchDate(match.getMatchDate());
         response.setMatchTime(match.getMatchTime());
         response.setStatus(match.getStatus());
         response.setCreatedAt(match.getCreatedAt());
+
+        if (match.getScore() != null) {
+            response.setHomeScore(match.getScore().getHome());
+            response.setAwayScore(match.getScore().getAway());
+        }
 
         if (pitch != null) {
             PitchDTO pitchDTO = new PitchDTO();

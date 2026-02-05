@@ -2,20 +2,17 @@ package com.app.sportify_backend.controllers;
 
 import com.app.sportify_backend.dto.CreateMatchRequest;
 import com.app.sportify_backend.dto.MatchResponse;
-import com.app.sportify_backend.dto.PitchDTO;
+import com.app.sportify_backend.dto.UpdateScoreRequest;
 import com.app.sportify_backend.models.MatchStatus;
-import com.app.sportify_backend.models.Pitch;
 import com.app.sportify_backend.services.MatchService;
-import com.app.sportify_backend.services.PitchService;
+import com.app.sportify_backend.models.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/matches")
@@ -24,119 +21,84 @@ import java.util.stream.Collectors;
 public class MatchController {
 
     private final MatchService matchService;
-    private final PitchService pitchService;
 
+    // -------------------- CREATE MATCH --------------------
     @PostMapping
-    public ResponseEntity<?> createMatch(
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
+    public MatchResponse createMatch(
             @RequestBody CreateMatchRequest request,
-            @RequestHeader("X-User-Id") String userId) {
-        try {
-            MatchResponse match = matchService.createMatch(request, userId);
-            return ResponseEntity.ok(match);
-        } catch (RuntimeException e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-        }
+            Authentication authentication
+    ) {
+        User user = (User) authentication.getPrincipal();
+        return matchService.createMatch(request, user.getId());
     }
 
-    @GetMapping("/team/{teamId}")
-    public ResponseEntity<List<MatchResponse>> getTeamMatches(@PathVariable String teamId) {
-        List<MatchResponse> matches = matchService.getTeamMatches(teamId);
-        return ResponseEntity.ok(matches);
-    }
-
+    // -------------------- GET MATCH BY ID --------------------
     @GetMapping("/{matchId}")
-    public ResponseEntity<?> getMatch(@PathVariable String matchId) {
-        try {
-            MatchResponse match = matchService.getMatchById(matchId);
-            return ResponseEntity.ok(match);
-        } catch (RuntimeException e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-        }
+    @PreAuthorize("isAuthenticated()")
+    public MatchResponse getMatch(@PathVariable String matchId) {
+        return matchService.getMatchById(matchId);
     }
 
+    // -------------------- GET MATCHES BY TEAM --------------------
+    @GetMapping("/team/{teamId}")
+    @PreAuthorize("isAuthenticated()")
+    public List<MatchResponse> getTeamMatches(@PathVariable String teamId) {
+        return matchService.getTeamMatches(teamId);
+    }
+
+    // -------------------- UPDATE MATCH STATUS --------------------
     @PatchMapping("/{matchId}/status")
-    public ResponseEntity<?> updateMatchStatus(
+    @PreAuthorize("isAuthenticated()")
+    public MatchResponse updateMatchStatus(
             @PathVariable String matchId,
             @RequestParam MatchStatus status,
-            @RequestHeader("X-User-Id") String userId) {
-        try {
-            MatchResponse match = matchService.updateMatchStatus(matchId, status, userId);
-            return ResponseEntity.ok(match);
-        } catch (RuntimeException e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-        }
+            Authentication authentication
+    ) {
+        User user = (User) authentication.getPrincipal();
+        return matchService.updateMatchStatus(matchId, status, user.getId());
     }
 
+    // -------------------- UPDATE MATCH SCORE --------------------
+    @PutMapping("/{matchId}/score")
+    @PreAuthorize("isAuthenticated()")
+    public MatchResponse updateMatchScore(
+            @PathVariable String matchId,
+            @RequestBody UpdateScoreRequest request,
+            Authentication authentication
+    ) {
+        User user = (User) authentication.getPrincipal();
+        return matchService.updateMatchScore(matchId, request, user.getId());
+    }
+
+    // -------------------- CANCEL MATCH --------------------
     @DeleteMapping("/{matchId}")
-    public ResponseEntity<?> cancelMatch(
+    @PreAuthorize("isAuthenticated()")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelMatch(
             @PathVariable String matchId,
-            @RequestHeader("X-User-Id") String userId) {
-        try {
-            matchService.cancelMatch(matchId, userId);
-            return ResponseEntity.ok().build();
-        } catch (RuntimeException e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-        }
+            Authentication authentication
+    ) {
+        User user = (User) authentication.getPrincipal();
+        matchService.cancelMatch(matchId, user.getId());
     }
 
+    // -------------------- CONFIRM MATCH --------------------
     @PostMapping("/{matchId}/confirm")
-    public ResponseEntity<?> confirmMatch(
+    @PreAuthorize("isAuthenticated()")
+    public MatchResponse confirmMatch(
             @PathVariable String matchId,
-            @RequestHeader("X-User-Id") String userId) {
-        try {
-            MatchResponse match = matchService.confirmMatch(matchId, userId);
-            return ResponseEntity.ok(match);
-        } catch (RuntimeException e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-        }
+            Authentication authentication
+    ) {
+        User user = (User) authentication.getPrincipal();
+        return matchService.confirmMatch(matchId, user.getId());
     }
 
+    // -------------------- GET MATCHES BY STATUS --------------------
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<MatchResponse>> getMatchesByStatus(@PathVariable MatchStatus status) {
-        List<MatchResponse> matches = matchService.getMatchesByStatus(status);
-        return ResponseEntity.ok(matches);
-    }
-
-    @GetMapping("/pitches")
-    public ResponseEntity<List<PitchDTO>> getAllActivePitches() {
-        List<Pitch> pitches = pitchService.getAllActivePitches();
-        List<PitchDTO> pitchDTOs = pitches.stream()
-                .map(this::convertToPitchDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(pitchDTOs);
-    }
-
-    @GetMapping("/pitches/city/{city}")
-    public ResponseEntity<List<PitchDTO>> getPitchesByCity(@PathVariable String city) {
-        List<Pitch> pitches = pitchService.getPitchesByCity(city);
-        List<PitchDTO> pitchDTOs = pitches.stream()
-                .map(this::convertToPitchDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(pitchDTOs);
-    }
-
-    private PitchDTO convertToPitchDTO(Pitch pitch) {
-        PitchDTO dto = new PitchDTO();
-        dto.setId(pitch.getId());
-        dto.setName(pitch.getName());
-        dto.setAddress(pitch.getAddress());
-        dto.setCity(pitch.getCity());
-        dto.setPrice(pitch.getPrice());
-        dto.setSize(pitch.getSize());
-        dto.setRating(pitch.getRating());
-        dto.setSurfaceType(pitch.getSurfaceType());
-        dto.setImageUrl(pitch.getImageUrl());
-        dto.setActive(pitch.isActive());
-        return dto;
+    @PreAuthorize("isAuthenticated()")
+    public List<MatchResponse> getMatchesByStatus(@PathVariable MatchStatus status) {
+        return matchService.getMatchesByStatus(status);
     }
 }
