@@ -4,9 +4,11 @@ import com.app.sportify_backend.dto.NotificationResponse;
 import com.app.sportify_backend.models.*;
 import com.app.sportify_backend.repositories.NotificationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,21 +19,7 @@ import java.util.stream.Collectors;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
-
-    /**
-     * Créer et envoyer une notification
-     */
-    public Notification send(
-            String recipientId,
-            String senderId,
-            String title,
-            String message,
-            NotificationType type,
-            String referenceId
-    ) {
-        return send(recipientId, senderId, title, message, type, referenceId, null);
-    }
-
+    private final SimpMessagingTemplate messagingTemplate;
 
     public Notification send(
             String recipientId,
@@ -54,51 +42,36 @@ public class NotificationService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        return notificationRepository.save(notification);
+        notification = notificationRepository.save(notification);
+
+        messagingTemplate.convertAndSendToUser(
+                recipientId,
+                "/queue/notifications",
+                toResponse(notification)
+        );
+
+        return notification;
     }
 
-    public void sendInvitationCancelledNotification(
-            Invitation invitation,
-            String cancelledByUserId,
-            CancelReason reason,
-            String customMessage
-    ) {
+    public void sendInvitationCancelledNotification(Invitation invitation, String actorId, CancelReason reason, String message) {
+        List<String> recipients = new ArrayList<>();
 
-        boolean cancelledBySender = invitation.getSenderId().equals(cancelledByUserId);
+        if (invitation.getSenderId() != null) recipients.add(invitation.getSenderId());
+        if (invitation.getReceiverId() != null) recipients.add(invitation.getReceiverId());
 
-        String reasonText = switch (reason) {
-            case NO_PLAYERS -> "manque de joueurs";
-            case PITCH_NOT_AVAILABLE -> "terrain non disponible";
-            case BAD_WEATHER -> "mauvaises conditions météo";
-            case OTHERS -> customMessage != null ? customMessage : "autre raison";
-        };
+        for (String userId : recipients) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("invitationId", invitation.getId());
+            payload.put("status", invitation.getStatus());
+            payload.put("type", invitation.getType());
+            payload.put("message", message);
+            payload.put("cancelledBy", actorId);
+            payload.put("teamId", invitation.getTeamId());
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("invitationId", invitation.getId());
-        data.put("reason", reason.name());
-        data.put("reasonText", reasonText);
-
-        if (cancelledBySender) {
-            send(
-                    invitation.getReceiverId(),
-                    cancelledByUserId,
-                    "Invitation annulée",
-                    "L'invitation de l'équipe " + invitation.getSenderTeamName()
-                            + " a été annulée à cause de " + reasonText,
-                    NotificationType.MATCH_CANCELLED,
-                    invitation.getId(),
-                    data
-            );
-        } else {
-            send(
-                    invitation.getSenderId(),
-                    cancelledByUserId,
-                    "Invitation annulée",
-                    "L'équipe " + invitation.getReceiverTeamName()
-                            + " a annulé l'invitation à cause de " + reasonText,
-                    NotificationType.MATCH_CANCELLED,
-                    invitation.getId(),
-                    data
+            messagingTemplate.convertAndSendToUser(
+                    userId,
+                    "/queue/invitations",
+                    payload
             );
         }
     }

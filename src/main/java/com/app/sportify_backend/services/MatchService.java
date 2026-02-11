@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
@@ -66,7 +67,7 @@ public class MatchService {
         match.setMatchDate(request.getMatchDate());
         match.setMatchTime(request.getMatchTime());
         match.setStatus(MatchStatus.PLANNED);
-        match.setScore(null); // Score null lors de la création
+        match.setScore(null);
         match.setCreatedBy(userId);
         match.setCreatedAt(LocalDateTime.now());
         match.setUpdatedAt(LocalDateTime.now());
@@ -85,24 +86,20 @@ public class MatchService {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new RuntimeException("Match non trouvé"));
 
-        // Validation: le match doit être confirmé ou terminé pour ajouter un score
         if (match.getStatus() == MatchStatus.CANCELLED) {
             throw new RuntimeException("Impossible d'ajouter un score à un match annulé");
         }
 
-        // Validation des scores (pas de scores négatifs)
         if (request.getHomeScore() < 0 || request.getAwayScore() < 0) {
             throw new RuntimeException("Les scores ne peuvent pas être négatifs");
         }
 
-        // Créer le sous-document Score
         Match.Score score = new Match.Score();
         score.setHome(request.getHomeScore());
         score.setAway(request.getAwayScore());
 
         match.setScore(score);
 
-        // Optionnel: changer le statut du match en FINISHED
         if (match.getStatus() != MatchStatus.COMPLETED) {
             match.setStatus(MatchStatus.COMPLETED);
         }
@@ -171,6 +168,18 @@ public class MatchService {
                     return convertToResponse(match, pitch);
                 })
                 .collect(Collectors.toList());
+    }
+
+    public long countTodayMatches() {
+        LocalDate today = LocalDate.now();
+        List<Match> todayMatches = matchRepository.findByMatchDate(today);
+
+        long count = todayMatches.stream()
+                .filter(match -> match.getStatus() != MatchStatus.CANCELLED)
+                .count();
+
+        log.info("Nombre de matchs aujourd'hui ({}): {}", today, count);
+        return count;
     }
 
     private MatchResponse convertToResponse(Match match, Pitch pitch) {

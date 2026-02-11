@@ -101,4 +101,11 @@ public class MatchController {
     public List<MatchResponse> getMatchesByStatus(@PathVariable MatchStatus status) {
         return matchService.getMatchesByStatus(status);
     }
+
+    // -------------------- COUNT TODAY'S MATCHES --------------------
+    @GetMapping("/today/count")
+    @PreAuthorize("isAuthenticated()")
+    public long getTodayMatchesCount() {
+        return matchService.countTodayMatches();
+    }
 }

@@ -14,4 +14,5 @@ public class PitchDTO {
     private String surfaceType;
     private String imageUrl;
     private boolean isActive;
+    private String createdBy;
 }
