@@ -27,6 +27,22 @@ public class TeamService {
 
     public Team createTeam(Team team, MultipartFile image) throws IOException {
         team.setIsActivated(false);
+
+        team.setTeamCode(generateUniqueTeamCode());
+
+        User owner = userRepository.findById(team.getOwnerId())
+                .orElseThrow(() -> new RuntimeException("Owner not found"));
+
+        List<Team.TeamMember> members = new ArrayList<>();
+        members.add(Team.TeamMember.builder()
+                .userId(owner.getId())
+                .userFirstName(owner.getFirstname())
+                .userLastName(owner.getLastname())
+                .role(MemberRole.OWNER)
+                .build());
+
+        team.setMembers(members);
+
         team = teamRepository.save(team);
 
         if (image != null && !image.isEmpty()) {
@@ -41,12 +57,12 @@ public class TeamService {
             team.setLogoUrl("/uploads/teams/" + filename);
             team = teamRepository.save(team);
         }
-        team.setTeamCode(generateUniqueTeamCode());
 
-        return teamRepository.save(team);
+        return team;
     }
 
     public List<Team> getTeamsByOwner(String ownerId) {
+
         return teamRepository.findByOwnerId(ownerId);
     }
 
@@ -58,9 +74,25 @@ public class TeamService {
     }
 
     public PlayerTeamsResponse getUserTeams(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String activeTeamId = user.getActiveTeamId();
+
+        List<Team> ownedTeams = getTeamsByOwner(userId);
+        List<Team> memberTeams = getTeamsWhereUserIsMember(userId);
+
+        ownedTeams.forEach(team -> {
+            team.setIsActivated(team.getId().equals(activeTeamId));
+        });
+
+        memberTeams.forEach(team -> {
+            team.setIsActivated(team.getId().equals(activeTeamId));
+        });
+
         return PlayerTeamsResponse.builder()
-                .ownedTeams(getTeamsByOwner(userId))
-                .memberTeams(getTeamsWhereUserIsMember(userId))
+                .ownedTeams(ownedTeams)
+                .memberTeams(memberTeams)
                 .build();
     }
 
@@ -118,19 +150,13 @@ public class TeamService {
             throw new RuntimeException("L'utilisateur n'est pas autorisé à activer cette équipe");
         }
 
-        List<Team> allUserTeams = teamRepository.findByOwnerId(userId);
-        allUserTeams.addAll(teamRepository.findByMembersUserId(userId)
-                .stream()
-                .filter(t -> !allUserTeams.contains(t))
-                .toList());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        for (Team t : allUserTeams) {
-            t.setIsActivated(false);
-            teamRepository.save(t);
-        }
+        user.setActiveTeamId(teamId);
+        userRepository.save(user);
 
-        teamToActivate.setIsActivated(true);
-        return teamRepository.save(teamToActivate);
+        return teamToActivate;
     }
 
     public Team deactivateTeam(String teamId) {

@@ -2,6 +2,7 @@ package com.app.sportify_backend.models;
 
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -11,6 +12,10 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
+@CompoundIndex(
+        name = "invitation_unique",
+        def = "{'senderTeamId': 1, 'receiverTeamId': 1}",
+        unique = true )
 public class Invitation {
 
     @Id

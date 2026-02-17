@@ -56,6 +56,8 @@ public class User implements UserDetails {
 
     private List<String> teamIds = new ArrayList<>();
 
+    private String activeTeamId;
+
     @JsonIgnore
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Pitch pendingPitch;

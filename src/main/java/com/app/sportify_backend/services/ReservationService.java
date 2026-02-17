@@ -1,6 +1,8 @@
 package com.app.sportify_backend.services;
 
 import com.app.sportify_backend.dto.ReservationResponse;
+import com.app.sportify_backend.exception.ResourceNotFoundException;
+import com.app.sportify_backend.exception.UnauthorizedException;
 import com.app.sportify_backend.models.*;
 import com.app.sportify_backend.repositories.PitchRepository;
 import com.app.sportify_backend.repositories.ReservationRepository;
@@ -179,7 +181,7 @@ public class ReservationService {
         );
     }
 
-    //---------------------REJECT RESERVATION (par le propriétaire du terrain)---------------------------------------
+    //---------------------REJECT RESERVATION---------------------------------------
     @Transactional
     public void rejectReservation(String reservationId, String userId) {
 
@@ -285,24 +287,20 @@ public class ReservationService {
                 .collect(Collectors.toList());
     }
 
-    //---------------------GET MY TEAM RESERVATIONS------------------------------------------------------------------
-    public List<ReservationResponse> getMyTeamReservations(String userId) {
+    //---------------------GET TEAM RESERVATIONS------------------------------------------------------------------
+    public List<ReservationResponse> getTeamReservations(String teamId, String userId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new ResourceNotFoundException("Équipe non trouvée"));
 
-        List<Team> myTeams = teamRepository.findByOwnerId(userId);
         List<Reservation> reservations = new ArrayList<>();
 
-        for (Team team : myTeams) {
-            List<Reservation> senderReservations = reservationRepository
-                    .findBySenderTeamIdAndCancelledBySenderFalse(team.getId());
+        List<Reservation> senderReservations = reservationRepository
+                .findBySenderTeamIdAndCancelledBySenderFalse(teamId);
+        reservations.addAll(senderReservations);
 
-            reservations.addAll(senderReservations);
-
-            List<Reservation> adverseReservations = reservationRepository
-                    .findByAdverseTeamId(team.getId());
-
-            reservations.addAll(adverseReservations);
-
-        }
+        List<Reservation> adverseReservations = reservationRepository
+                .findByAdverseTeamId(teamId);
+        reservations.addAll(adverseReservations);
 
         Map<String, Reservation> uniqueReservations = reservations.stream()
                 .collect(Collectors.toMap(
@@ -311,7 +309,7 @@ public class ReservationService {
                         (existing, replacement) -> existing
                 ));
 
-        System.out.println("🔍 Total reservations found: " + uniqueReservations.size());
+        System.out.println("Reservations for team " + teamId + ": " + uniqueReservations.size());
         uniqueReservations.values().forEach(r ->
                 System.out.println("   - Reservation " + r.getId() + ": " + r.getStatus())
         );
@@ -510,50 +508,6 @@ public class ReservationService {
                     data
             );
         }
-    }
-
-    //---------------------GET TEAM RESERVATIONS---------------------------------------------------------------------
-    public List<ReservationResponse> getTeamReservations(String teamId, String userId) {
-
-        Team team = teamRepository.findById(teamId)
-                .orElseThrow(() -> new RuntimeException("TEAM_NOT_FOUND"));
-
-        // Vérifier que l'utilisateur est membre ou propriétaire de l'équipe
-        boolean isOwner = team.getOwnerId().equals(userId);
-        boolean isMember = team.getMembers().stream()
-                .anyMatch(m -> m.getUserId().equals(userId));
-
-        if (!isOwner && !isMember) {
-            throw new RuntimeException("NOT_TEAM_MEMBER");
-        }
-
-        // Récupérer toutes les réservations où l'équipe est sender ou adverse
-        List<Reservation> senderReservations = reservationRepository
-                .findBySenderTeamIdAndCancelledBySenderFalse(teamId);
-
-        List<Reservation> adverseReservations = reservationRepository
-                .findByAdverseTeamId(teamId);
-
-        Set<String> reservationIds = new HashSet<>();
-        List<Reservation> allReservations = new ArrayList<>();
-
-        for (Reservation r : senderReservations) {
-            if (reservationIds.add(r.getId())) {
-                allReservations.add(r);
-            }
-        }
-
-        for (Reservation r : adverseReservations) {
-            if (reservationIds.add(r.getId())) {
-                allReservations.add(r);
-            }
-        }
-
-        return allReservations.stream()
-                .map(ReservationResponse::from)
-                .sorted(Comparator.comparing(ReservationResponse::getDay)
-                        .thenComparing(ReservationResponse::getHour))
-                .collect(Collectors.toList());
     }
 
     //---------------------GET RESERVATION BY ID---------------------------------------------------------------------

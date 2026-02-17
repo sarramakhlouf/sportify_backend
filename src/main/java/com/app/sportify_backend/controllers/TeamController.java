@@ -4,10 +4,12 @@ import com.app.sportify_backend.dto.TeamPlayerResponse;
 import com.app.sportify_backend.dto.UpdateTeamRequest;
 import com.app.sportify_backend.dto.PlayerTeamsResponse;
 import com.app.sportify_backend.models.Team;
+import com.app.sportify_backend.models.User;
 import com.app.sportify_backend.services.TeamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
@@ -63,9 +65,10 @@ public class TeamController {
         return teamService.updateTeam(id, request, image);
     }
 
-    @PutMapping("/activate/{teamId}/owner/{ownerId}")
-    public Team activateTeam(@PathVariable String teamId, @PathVariable String ownerId) {
-        return teamService.activateTeam(teamId, ownerId);
+    @PutMapping("/activate/{teamId}/user/{userId}")
+    public Team activateTeam(@PathVariable String teamId, Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return teamService.activateTeam(teamId, user.getId());
     }
 
     @PutMapping("/deactivate/{teamId}")

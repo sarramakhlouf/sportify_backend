@@ -3,6 +3,7 @@ package com.app.sportify_backend.controllers;
 import com.app.sportify_backend.dto.CreateReservationRequest;
 import com.app.sportify_backend.dto.ReservationResponse;
 import com.app.sportify_backend.dto.UpdateScoreRequest;
+import com.app.sportify_backend.models.Team;
 import com.app.sportify_backend.models.User;
 import com.app.sportify_backend.services.ReservationService;
 import lombok.RequiredArgsConstructor;
@@ -79,12 +80,13 @@ public class ReservationController {
         return ResponseEntity.ok(reservations);
     }
 
-    @GetMapping("/my-teams")
-    public ResponseEntity<List<ReservationResponse>> getMyTeamReservations(
+    @GetMapping("/team/{teamId}")
+    public ResponseEntity<List<ReservationResponse>> getTeamReservations(
+            @PathVariable String teamId,
             Authentication authentication
     ) {
         User user = (User) authentication.getPrincipal();
-        List<ReservationResponse> reservations = reservationService.getMyTeamReservations(user.getId());
+        List<ReservationResponse> reservations = reservationService.getTeamReservations(teamId, user.getId());
         return ResponseEntity.ok(reservations);
     }
 
@@ -129,18 +131,6 @@ public class ReservationController {
                 user.getId()
         );
         return ResponseEntity.ok(response);
-    }
-
-    // -------------------- NOUVEAUX ENDPOINTS --------------------
-
-    @GetMapping("/team/{teamId}")
-    public ResponseEntity<List<ReservationResponse>> getTeamReservations(
-            @PathVariable String teamId,
-            Authentication authentication
-    ) {
-        User user = (User) authentication.getPrincipal();
-        List<ReservationResponse> reservations = reservationService.getTeamReservations(teamId, user.getId());
-        return ResponseEntity.ok(reservations);
     }
 
     @GetMapping("/{reservationId}")
