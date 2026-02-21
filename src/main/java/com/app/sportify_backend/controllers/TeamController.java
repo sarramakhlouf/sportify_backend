@@ -103,4 +103,11 @@ public class TeamController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @DeleteMapping("/{teamId}/leave")
+    public ResponseEntity<?> leaveTeam(@PathVariable String teamId, Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        teamService.leaveTeam(teamId, user.getId());
+        return ResponseEntity.ok().body("Vous avez quitté l'équipe avec succès");
+    }
 }

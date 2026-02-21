@@ -1,15 +1,27 @@
 package com.app.sportify_backend.services;
 
+import com.app.sportify_backend.dto.ReservationResponse;
 import com.app.sportify_backend.models.Pitch;
+import com.app.sportify_backend.models.Reservation;
+import com.app.sportify_backend.models.ReservationStatus;
 import com.app.sportify_backend.repositories.PitchRepository;
+import com.app.sportify_backend.repositories.ReservationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import java.time.LocalTime;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @Service
 @RequiredArgsConstructor
@@ -17,17 +29,32 @@ import java.util.stream.Collectors;
 public class PitchService {
 
     private final PitchRepository pitchRepository;
+    private final ReservationRepository reservationRepository;
 
-    public Pitch createPitch(Pitch pitch, String managerId) {
+    public Pitch createPitch(Pitch pitch, String managerId, MultipartFile image) throws IOException {
         pitch.setCreatedBy(managerId);
         pitch.setCreatedViaValidation(true);
         pitch.setCreatedViaBackoffice(false);
         pitch.setCreatedAt(LocalDateTime.now());
 
-        Pitch savedPitch = pitchRepository.save(pitch);
-        log.info("Pitch créé dans la collection: {} pour le manager {}", savedPitch.getId(), managerId);
+        pitch = pitchRepository.save(pitch);
 
-        return savedPitch;
+        if (image != null && !image.isEmpty()) {
+            String fileExtension = image.getOriginalFilename()
+                    .substring(image.getOriginalFilename().lastIndexOf("."));
+            String filename = pitch.getId() + "_" + UUID.randomUUID() + fileExtension;
+
+            Path uploadPath = Paths.get("uploads/pitches/" + filename);
+            Files.createDirectories(uploadPath.getParent());
+            Files.write(uploadPath, image.getBytes());
+
+            pitch.setImageUrl("/uploads/pitches/" + filename);
+            pitch = pitchRepository.save(pitch);
+        }
+
+        log.info("Pitch créé dans la collection: {} pour le manager {}", pitch.getId(), managerId);
+
+        return pitch;
     }
 
     public Pitch getManagerPitch(String managerId) {
@@ -128,5 +155,98 @@ public class PitchService {
                                 (pitch.getAddress() != null && pitch.getAddress().toLowerCase().contains(lowerQuery))
                 )
                 .collect(Collectors.toList());
+    }
+
+    //---------------------GET TODAY MATCH COUNT--------------------------------------------------------------------
+    public long getTodayMatchesCount(String pitchId, String userId) {
+        Pitch pitch = pitchRepository.findById(pitchId)
+                .orElseThrow(() -> new RuntimeException("PITCH_NOT_FOUND"));
+
+        if (!pitch.getCreatedBy().equals(userId)) {
+            throw new RuntimeException("NOT_PITCH_OWNER");
+        }
+
+        return pitchRepository.countByPitchIdAndStatusAndDay(
+                pitchId,
+                ReservationStatus.CONFIRMED,
+                LocalDate.now()
+        );
+    }
+
+    //---------------------GET ALL RESERVATIONS FOR A PITCH (public - pour voir les créneaux disponibles)----------
+    public List<ReservationResponse> getConfirmedPitchReservations(String pitchId) {
+
+        Pitch pitch = pitchRepository.findById(pitchId)
+                .orElseThrow(() -> new RuntimeException("PITCH_NOT_FOUND"));
+
+        List<Reservation> reservations = reservationRepository
+                .findByPitchIdAndStatusOrderByDayAscHourAsc(
+                        pitchId,
+                        ReservationStatus.CONFIRMED
+                );
+
+        return reservations.stream()
+
+                .map(ReservationResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    //---------------------GET AVAILABLE TIME SLOTS------------------------------------------------------------------
+    public List<Map<String, Object>> getAvailableTimeSlots(
+            String pitchId,
+            LocalDate day
+    ) {
+
+        Pitch pitch = pitchRepository.findById(pitchId)
+                .orElseThrow(() -> new RuntimeException("PITCH_NOT_FOUND"));
+
+        List<Reservation> reservations = reservationRepository
+                .findByPitchIdAndDay(pitchId, day);
+
+        List<Map<String, Object>> timeSlots = new ArrayList<>();
+        LocalTime startTime = LocalTime.of(8, 0);
+        LocalTime endTime = LocalTime.of(22, 0);
+
+        while (startTime.isBefore(endTime)) {
+            LocalTime currentTime = startTime;
+
+            boolean isAvailable = reservations.stream()
+                    .filter(r -> r.getStatus() == ReservationStatus.CONFIRMED)
+                    .noneMatch(r -> r.getHour().equals(currentTime));
+
+            Map<String, Object> slot = new HashMap<>();
+            slot.put("time", currentTime.toString());
+            slot.put("available", isAvailable);
+
+            timeSlots.add(slot);
+
+            startTime = startTime.plusHours(1);
+        }
+
+        return timeSlots;
+    }
+
+    //---------------------GET WEEKLY STATS------------------------------------------------------------------
+    public Map<String, Long> getWeeklyStats(String pitchId, String userId) {
+        Pitch pitch = pitchRepository.findById(pitchId)
+                .orElseThrow(() -> new RuntimeException("PITCH_NOT_FOUND"));
+
+        if (!pitch.getCreatedBy().equals(userId)) {
+            throw new RuntimeException("NOT_PITCH_OWNER");
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDate monday = today.with(DayOfWeek.MONDAY);
+
+        Map<String, Long> stats = new LinkedHashMap<>();
+        for (int i = 0; i < 7; i++) {
+            LocalDate day = monday.plusDays(i);
+            long count = pitchRepository.countByPitchIdAndStatusAndDay(
+                    pitchId, ReservationStatus.CONFIRMED, day
+            );
+            stats.put(day.getDayOfWeek().name(), count); // "MONDAY", "TUESDAY"...
+        }
+
+        return stats;
     }
 }

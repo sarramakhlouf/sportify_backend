@@ -2,8 +2,8 @@ package com.app.sportify_backend.controllers;
 
 import com.app.sportify_backend.dto.CreateReservationRequest;
 import com.app.sportify_backend.dto.ReservationResponse;
+import com.app.sportify_backend.dto.TeamStatsResponse;
 import com.app.sportify_backend.dto.UpdateScoreRequest;
-import com.app.sportify_backend.models.Team;
 import com.app.sportify_backend.models.User;
 import com.app.sportify_backend.services.ReservationService;
 import lombok.RequiredArgsConstructor;
@@ -73,10 +73,12 @@ public class ReservationController {
 
     @GetMapping("/pending")
     public ResponseEntity<List<ReservationResponse>> getPendingReservations(
+            @RequestParam String pitchId,
             Authentication authentication
     ) {
         User user = (User) authentication.getPrincipal();
-        List<ReservationResponse> reservations = reservationService.getPendingReservations(user.getId());
+        List<ReservationResponse> reservations = reservationService
+                .getPendingReservations(pitchId, user.getId());
         return ResponseEntity.ok(reservations);
     }
 
@@ -88,33 +90,6 @@ public class ReservationController {
         User user = (User) authentication.getPrincipal();
         List<ReservationResponse> reservations = reservationService.getTeamReservations(teamId, user.getId());
         return ResponseEntity.ok(reservations);
-    }
-
-    @GetMapping("/pitch/{pitchId}")
-    public ResponseEntity<List<ReservationResponse>> getPitchReservations(
-            @PathVariable String pitchId,
-            Authentication authentication
-    ) {
-        User user = (User) authentication.getPrincipal();
-        List<ReservationResponse> reservations = reservationService.getPitchReservations(pitchId, user.getId());
-        return ResponseEntity.ok(reservations);
-    }
-
-    @GetMapping("/pitch/{pitchId}/confirmed")
-    public ResponseEntity<List<ReservationResponse>> getConfirmedPitchReservations(
-            @PathVariable String pitchId
-    ) {
-        List<ReservationResponse> reservations = reservationService.getConfirmedPitchReservations(pitchId);
-        return ResponseEntity.ok(reservations);
-    }
-
-    @GetMapping("/pitch/{pitchId}/available-slots")
-    public ResponseEntity<List<Map<String, Object>>> getAvailableTimeSlots(
-            @PathVariable String pitchId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day
-    ) {
-        List<Map<String, Object>> slots = reservationService.getAvailableTimeSlots(pitchId, day);
-        return ResponseEntity.ok(slots);
     }
 
     @PutMapping("/{reservationId}/score")
@@ -166,5 +141,12 @@ public class ReservationController {
                 user.getId()
         );
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/team/{teamId}/stats")
+    public ResponseEntity<TeamStatsResponse> getTeamStats(
+            @PathVariable String teamId
+    ) {
+        return ResponseEntity.ok(reservationService.getTeamStats(teamId));
     }
 }

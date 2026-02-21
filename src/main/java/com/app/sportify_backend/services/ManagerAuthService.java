@@ -1,7 +1,6 @@
 package com.app.sportify_backend.services;
 
 import com.app.sportify_backend.dto.ManagerRegisterRequest;
-import com.app.sportify_backend.exception.AccountNotEnabledException;
 import com.app.sportify_backend.models.Pitch;
 import com.app.sportify_backend.models.Role;
 import com.app.sportify_backend.models.User;
@@ -14,10 +13,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
+
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @Service
 @RequiredArgsConstructor
@@ -30,12 +33,7 @@ public class ManagerAuthService {
     private final PitchService pitchService;
     private final JwtService jwtService;
 
-    /**
-     * Inscription d'un manager avec UN SEUL pitch
-     * Le pitch est stocké dans pendingPitch (pas encore dans la collection pitches)
-     */
-    public User registerManager(ManagerRegisterRequest request) {
-        // Vérifications
+    public User registerManager(ManagerRegisterRequest request, MultipartFile image) throws IOException {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Un utilisateur avec cet email existe déjà");
         }
@@ -44,7 +42,6 @@ public class ManagerAuthService {
             throw new RuntimeException("Un utilisateur avec ce téléphone existe déjà");
         }
 
-        // Créer le manager
         User manager = new User();
         manager.setFirstname(request.getFirstname());
         manager.setLastname(request.getLastname());
@@ -55,15 +52,27 @@ public class ManagerAuthService {
         manager.setRegistrationDate(LocalDateTime.now());
         manager.setEnabled(false);
 
-        // Stocker le pitch dans pendingPitch (pas encore dans la collection pitches)
         if (request.getPitch() != null) {
             Pitch pitch = request.getPitch();
             initializePitch(pitch);
+
+            // ✅ Sauvegarde l'image dès l'inscription et stocke le chemin dans pendingPitch
+            if (image != null && !image.isEmpty()) {
+                String fileExtension = image.getOriginalFilename()
+                        .substring(image.getOriginalFilename().lastIndexOf("."));
+                String filename = pitch.getId() + "_" + UUID.randomUUID() + fileExtension;
+
+                Path uploadPath = Paths.get("uploads/pitches/" + filename);
+                Files.createDirectories(uploadPath.getParent());
+                Files.write(uploadPath, image.getBytes());
+
+                pitch.setImageUrl("/uploads/pitches/" + filename);
+            }
+
             manager.setPendingPitch(pitch);
         }
 
         User savedManager = userRepository.save(manager);
-
         log.info("Manager inscrit: {} - Pitch en attente de validation", manager.getEmail());
 
         return savedManager;
@@ -89,18 +98,22 @@ public class ManagerAuthService {
         String pitchId = null;
 
         if (manager.getPendingPitch() != null) {
-            Pitch createdPitch = pitchService.createPitch(
-                    manager.getPendingPitch(),
-                    manager.getId()
-            );
+            try {
+                Pitch createdPitch = pitchService.createPitch(
+                        manager.getPendingPitch(),
+                        manager.getId(),
+                        null
+                );
+                pitchId = createdPitch.getId();
+                manager.setPitchId(pitchId);
+                manager.setPendingPitch(null);
 
-            pitchId = createdPitch.getId();
-            manager.setPitchId(pitchId);
-            manager.setPendingPitch(null);
-
-            log.info("Pitch {} créé dans la collection pour le manager {}",
-                    pitchId,
-                    manager.getId());
+                log.info("Pitch {} créé dans la collection pour le manager {}",
+                        pitchId, manager.getId());
+            } catch (IOException e) {
+                log.error("Erreur lors de la création du pitch pour le manager {}", managerId, e);
+                throw new RuntimeException("Erreur lors de la création du pitch", e);
+            }
         }
 
         User activatedManager = userRepository.save(manager);

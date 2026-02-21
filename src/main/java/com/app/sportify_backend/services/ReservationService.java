@@ -1,17 +1,15 @@
 package com.app.sportify_backend.services;
 
 import com.app.sportify_backend.dto.ReservationResponse;
+import com.app.sportify_backend.dto.TeamStatsResponse;
 import com.app.sportify_backend.exception.ResourceNotFoundException;
-import com.app.sportify_backend.exception.UnauthorizedException;
 import com.app.sportify_backend.models.*;
-import com.app.sportify_backend.repositories.PitchRepository;
-import com.app.sportify_backend.repositories.ReservationRepository;
-import com.app.sportify_backend.repositories.TeamRepository;
-import com.app.sportify_backend.repositories.UserRepository;
+import com.app.sportify_backend.repositories.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -27,6 +25,7 @@ public class ReservationService {
     private final PitchRepository pitchRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final TeamStatsRepository teamStatsRepository;
 
     //---------------------CREATE RESERVATION------------------------------------------------------------------------
     @Transactional
@@ -114,8 +113,8 @@ public class ReservationService {
         data.put("hour", hour.toString());
 
         notificationService.send(
-                senderId,
                 pitch.getCreatedBy(),
+                senderId,
                 "Nouvelle demande de réservation",
                 senderTeam.getName() + " souhaite réserver " + pitch.getName() +
                         " le " + day + " à " + hour,
@@ -127,7 +126,7 @@ public class ReservationService {
         return ReservationResponse.from(reservation);
     }
 
-    //---------------------CONFIRM RESERVATION (par le propriétaire du terrain)--------------------------------------
+    //---------------------CONFIRM RESERVATION--------------------------------------
     @Transactional
     public void confirmReservation(String reservationId, String userId) {
 
@@ -276,11 +275,21 @@ public class ReservationService {
         );
     }
 
-    //---------------------GET PENDING RESERVATIONS (pour le propriétaire du terrain)--------------------------------
-    public List<ReservationResponse> getPendingReservations(String userId) {
+    //---------------------GET PENDING RESERVATIONS FOR PITCH MANAGER--------------------
+    public List<ReservationResponse> getPendingReservations(String pitchId, String userId) {
+
+        Pitch pitch = pitchRepository.findById(pitchId)
+                .orElseThrow(() -> new RuntimeException("PITCH_NOT_FOUND"));
+
+        if (!pitch.getCreatedBy().equals(userId)) {
+            throw new RuntimeException("NOT_PITCH_OWNER");
+        }
 
         List<Reservation> reservations = reservationRepository
-                .findByReceiverIdAndStatus(userId, ReservationStatus.PENDING);
+                .findByPitchIdAndStatusOrderByDayAscHourAsc(
+                        pitchId,
+                        ReservationStatus.PENDING
+                );
 
         return reservations.stream()
                 .map(ReservationResponse::from)
@@ -321,82 +330,6 @@ public class ReservationService {
                 .collect(Collectors.toList());
     }
 
-    //---------------------GET PITCH RESERVATIONS--------------------------------------------------------------------
-    public List<ReservationResponse> getPitchReservations(String pitchId, String userId) {
-
-        Pitch pitch = pitchRepository.findById(pitchId)
-                .orElseThrow(() -> new RuntimeException("PITCH_NOT_FOUND"));
-
-        // Vérifier que l'utilisateur est le propriétaire du terrain
-        if (!pitch.getCreatedBy().equals(userId)) {
-            throw new RuntimeException("NOT_PITCH_OWNER");
-        }
-
-        List<Reservation> reservations = reservationRepository
-                .findByPitchIdAndStatusOrderByDayAscHourAsc(
-                        pitchId,
-                        ReservationStatus.CONFIRMED
-                );
-
-        return reservations.stream()
-                .map(ReservationResponse::from)
-                .collect(Collectors.toList());
-    }
-
-    //---------------------GET ALL RESERVATIONS FOR A PITCH (public - pour voir les créneaux disponibles)----------
-    public List<ReservationResponse> getConfirmedPitchReservations(String pitchId) {
-
-        Pitch pitch = pitchRepository.findById(pitchId)
-                .orElseThrow(() -> new RuntimeException("PITCH_NOT_FOUND"));
-
-        List<Reservation> reservations = reservationRepository
-                .findByPitchIdAndStatusOrderByDayAscHourAsc(
-                        pitchId,
-                        ReservationStatus.CONFIRMED
-                );
-
-        return reservations.stream()
-                .map(ReservationResponse::from)
-                .collect(Collectors.toList());
-    }
-
-    //---------------------GET AVAILABLE TIME SLOTS------------------------------------------------------------------
-    public List<Map<String, Object>> getAvailableTimeSlots(
-            String pitchId,
-            LocalDate day
-    ) {
-
-        Pitch pitch = pitchRepository.findById(pitchId)
-                .orElseThrow(() -> new RuntimeException("PITCH_NOT_FOUND"));
-
-        // Récupérer toutes les réservations confirmées pour ce jour
-        List<Reservation> reservations = reservationRepository
-                .findByPitchIdAndDay(pitchId, day);
-
-        // Créer les créneaux horaires (exemple: de 8h à 22h)
-        List<Map<String, Object>> timeSlots = new ArrayList<>();
-        LocalTime startTime = LocalTime.of(8, 0);
-        LocalTime endTime = LocalTime.of(22, 0);
-
-        while (startTime.isBefore(endTime)) {
-            LocalTime currentTime = startTime;
-
-            boolean isAvailable = reservations.stream()
-                    .filter(r -> r.getStatus() == ReservationStatus.CONFIRMED)
-                    .noneMatch(r -> r.getHour().equals(currentTime));
-
-            Map<String, Object> slot = new HashMap<>();
-            slot.put("time", currentTime.toString());
-            slot.put("available", isAvailable);
-
-            timeSlots.add(slot);
-
-            startTime = startTime.plusHours(1); // Créneaux d'1 heure
-        }
-
-        return timeSlots;
-    }
-
     //---------------------UPDATE SCORE------------------------------------------------------------------------------
     @Transactional
     public ReservationResponse updateScore(
@@ -409,13 +342,11 @@ public class ReservationService {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new RuntimeException("RESERVATION_NOT_FOUND"));
 
-        // Vérifier que la réservation est confirmée ou complétée
         if (reservation.getStatus() != ReservationStatus.CONFIRMED &&
                 reservation.getStatus() != ReservationStatus.COMPLETED) {
             throw new RuntimeException("RESERVATION_NOT_CONFIRMED");
         }
 
-        // Vérifier que l'utilisateur est autorisé (sender ou receiver ou membre des équipes)
         boolean isSender = reservation.getSenderId().equals(userId);
         boolean isReceiver = reservation.getReceiverId().equals(userId);
 
@@ -431,7 +362,6 @@ public class ReservationService {
             throw new RuntimeException("NOT_ALLOWED");
         }
 
-        // Créer ou mettre à jour le score
         Reservation.Score score = Reservation.Score.builder()
                 .home(homeScore)
                 .away(awayScore)
@@ -439,7 +369,6 @@ public class ReservationService {
 
         reservation.setScore(score);
 
-        // Si la réservation est confirmée et que le match est terminé, mettre à jour le statut
         LocalDateTime matchDateTime = LocalDateTime.of(reservation.getDay(), reservation.getHour());
         if (LocalDateTime.now().isAfter(matchDateTime.plusMinutes(reservation.getDuration()))) {
             reservation.setStatus(ReservationStatus.COMPLETED);
@@ -448,9 +377,10 @@ public class ReservationService {
         reservation.setUpdatedAt(LocalDateTime.now());
         reservationRepository.save(reservation);
 
-        // Notifier les équipes du score final si le match est complété
         if (reservation.getStatus() == ReservationStatus.COMPLETED) {
             notifyScoreUpdate(reservation);
+            recalculateAndSaveTeamStats(reservation.getSenderTeamId());
+            recalculateAndSaveTeamStats(reservation.getAdverseTeamId());
         }
 
         return ReservationResponse.from(reservation);
@@ -481,9 +411,9 @@ public class ReservationService {
                 reservation.getScore().getAway() + " " +
                 adverseTeam.getName();
 
-        // Notifier les membres de l'équipe sender
         for (Team.TeamMember member : senderTeam.getMembers()) {
-            if (!member.getUserId().equals(reservation.getSenderId())) {
+            if (!member.getUserId().equals(reservation.getSenderId()) &&
+                    !member.getUserId().equals(senderTeam.getOwnerId())) {  // <-- ajout
                 notificationService.send(
                         reservation.getSenderId(),
                         member.getUserId(),
@@ -496,17 +426,18 @@ public class ReservationService {
             }
         }
 
-        // Notifier les membres de l'équipe adverse
         for (Team.TeamMember member : adverseTeam.getMembers()) {
-            notificationService.send(
-                    reservation.getSenderId(),
-                    member.getUserId(),
-                    "Score final enregistré",
-                    "Le match contre " + senderTeam.getName() + " est terminé: " + scoreText,
-                    NotificationType.MATCH_COMPLETED,
-                    adverseTeam.getId(),
-                    data
-            );
+            if (!member.getUserId().equals(adverseTeam.getOwnerId())) {  // <-- ajout
+                notificationService.send(
+                        reservation.getSenderId(),
+                        member.getUserId(),
+                        "Score final enregistré",
+                        "Le match contre " + senderTeam.getName() + " est terminé: " + scoreText,
+                        NotificationType.MATCH_COMPLETED,
+                        adverseTeam.getId(),
+                        data
+                );
+            }
         }
     }
 
@@ -564,7 +495,6 @@ public class ReservationService {
             );
         }
 
-        // Combiner et dédupliquer
         Map<String, Reservation> uniqueReservations = new HashMap<>();
 
         for (Reservation r : senderReservations) {
@@ -600,7 +530,6 @@ public class ReservationService {
             throw new RuntimeException("INVALID_STATUS");
         }
 
-        // Vérifier les permissions selon le nouveau statut
         boolean isSender = reservation.getSenderId().equals(userId);
         boolean isReceiver = reservation.getReceiverId().equals(userId);
 
@@ -608,7 +537,6 @@ public class ReservationService {
             throw new RuntimeException("NOT_ALLOWED");
         }
 
-        // Logique spécifique selon le statut
         switch (newStatus) {
             case CONFIRMED:
                 if (!isReceiver) {
@@ -633,7 +561,6 @@ public class ReservationService {
                 break;
 
             case COMPLETED:
-                // Vérifier que le match est terminé
                 LocalDateTime matchDateTime = LocalDateTime.of(
                         reservation.getDay(),
                         reservation.getHour()
@@ -652,5 +579,65 @@ public class ReservationService {
         reservationRepository.save(reservation);
 
         return ReservationResponse.from(reservation);
+    }
+
+    //---------------------GET TEAM STATS------------------------------------------------------------
+    public TeamStatsResponse getTeamStats(String teamId) {
+
+        teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("TEAM_NOT_FOUND"));
+
+        TeamStats stats = teamStatsRepository.findByTeamId(teamId)
+                .orElse(TeamStats.builder()
+                        .teamId(teamId)
+                        .played(0).wins(0).draws(0).losses(0)
+                        .goalsScored(0).goalsConceded(0)
+                        .goalDifference(0).winRate(0.0)
+                        .build());
+
+        return TeamStatsResponse.from(stats);
+    }
+
+    //---------------------RECALCULATE AND SAVE TEAM STATS-------------------------------------------
+    private void recalculateAndSaveTeamStats(String teamId) {
+
+        List<Reservation> completedMatches = reservationRepository
+                .findAllCompletedByTeam(ReservationStatus.COMPLETED, teamId);
+
+        int wins = 0, draws = 0, losses = 0;
+        int goalsScored = 0, goalsConceded = 0;
+        int played = 0;
+
+        for (Reservation r : completedMatches) {
+            if (r.getScore() == null) continue;
+
+            played++;
+            boolean isSender = r.getSenderTeamId().equals(teamId);
+
+            int myGoals    = isSender ? r.getScore().getHome() : r.getScore().getAway();
+            int theirGoals = isSender ? r.getScore().getAway() : r.getScore().getHome();
+
+            goalsScored   += myGoals;
+            goalsConceded += theirGoals;
+
+            if (myGoals > theirGoals)       wins++;
+            else if (myGoals == theirGoals) draws++;
+            else                            losses++;
+        }
+
+        TeamStats stats = teamStatsRepository.findByTeamId(teamId)
+                .orElse(TeamStats.builder().teamId(teamId).build());
+
+        stats.setPlayed(played);
+        stats.setWins(wins);
+        stats.setDraws(draws);
+        stats.setLosses(losses);
+        stats.setGoalsScored(goalsScored);
+        stats.setGoalsConceded(goalsConceded);
+        stats.setGoalDifference(goalsScored - goalsConceded);
+        stats.setWinRate(played == 0 ? 0.0 : (double) wins / played * 100);
+        stats.setUpdatedAt(LocalDateTime.now());
+
+        teamStatsRepository.save(stats);
     }
 }

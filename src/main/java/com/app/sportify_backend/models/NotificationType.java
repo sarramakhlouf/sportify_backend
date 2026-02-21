@@ -11,6 +11,7 @@ public enum NotificationType {
     RESERVATION_REJECTED,
     RESERVATION_CANCELLED,
     RESERVATION_REMINDER,
+    TEAM_LEFT
 }
 
 

@@ -1,12 +1,18 @@
 package com.app.sportify_backend.controllers;
 
+import com.app.sportify_backend.dto.ReservationResponse;
 import com.app.sportify_backend.models.Pitch;
+import com.app.sportify_backend.models.User;
 import com.app.sportify_backend.services.PitchService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/pitches")
@@ -100,4 +106,38 @@ public class PitchController {
         return ResponseEntity.ok(pitchService.getAllPitches());
     }
 
+    @GetMapping("/pitch/{pitchId}/today-count")
+    public ResponseEntity<Map<String, Long>> getTodayMatchesCount(
+            @PathVariable String pitchId,
+            Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        long count = pitchService.getTodayMatchesCount(pitchId, user.getId() );
+        return ResponseEntity.ok(Map.of("todayMatchesCount", count));
+    }
+
+    @GetMapping("/pitch/{pitchId}/confirmed")
+    public ResponseEntity<List<ReservationResponse>> getConfirmedPitchReservations(
+            @PathVariable String pitchId
+    ) {
+        List<ReservationResponse> reservations = pitchService.getConfirmedPitchReservations(pitchId);
+        return ResponseEntity.ok(reservations);
+    }
+
+    @GetMapping("/pitch/{pitchId}/available-slots")
+    public ResponseEntity<List<Map<String, Object>>> getAvailableTimeSlots(
+            @PathVariable String pitchId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day
+    ) {
+        List<Map<String, Object>> slots = pitchService.getAvailableTimeSlots(pitchId, day);
+        return ResponseEntity.ok(slots);
+    }
+
+    @GetMapping("/{pitchId}/weekly-stats")
+    public ResponseEntity<Map<String, Long>> getWeeklyStats(
+            @PathVariable String pitchId,
+            Authentication authentication
+    ) {
+        User user = (User) authentication.getPrincipal();
+        return ResponseEntity.ok(pitchService.getWeeklyStats(pitchId, user.getId()));
+    }
 }

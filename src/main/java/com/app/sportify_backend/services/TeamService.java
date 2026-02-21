@@ -15,15 +15,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class TeamService {
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     public Team createTeam(Team team, MultipartFile image) throws IOException {
         team.setIsActivated(false);
@@ -227,6 +226,50 @@ public class TeamService {
     public Team getTeamByCode(String teamCode) {
         return teamRepository.findByTeamCode(teamCode)
                 .orElseThrow(() -> new RuntimeException("Team not found with code: " + teamCode));
+    }
+
+    public void leaveTeam(String teamId, String userId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("TEAM_NOT_FOUND"));
+
+        if (team.getOwnerId().equals(userId)) {
+            throw new RuntimeException("Le propriétaire ne peut pas quitter son équipe");
+        }
+
+        boolean isMember = team.getMembers().stream()
+                .anyMatch(member -> member.getUserId().equals(userId));
+
+        if (!isMember) {
+            throw new RuntimeException("L'utilisateur n'est pas membre de cette équipe");
+        }
+
+        User leavingUser = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
+
+        team.getMembers().removeIf(member -> member.getUserId().equals(userId));
+        teamRepository.save(team);
+
+        if (teamId.equals(leavingUser.getActiveTeamId())) {
+            leavingUser.setActiveTeamId(null);
+            userRepository.save(leavingUser);
+        }
+
+        // Données supplémentaires pour le front
+        Map<String, Object> data = new HashMap<>();
+        data.put("teamId", teamId);
+        data.put("teamName", team.getName());
+        data.put("playerName", leavingUser.getFirstname() + " " + leavingUser.getLastname());
+
+        notificationService.send(
+                team.getOwnerId(),                                          // recipientId  → owner
+                userId,                                                     // senderId     → membre qui quitte
+                "Un joueur a quitté votre équipe",                         // title
+                leavingUser.getFirstname() + " " + leavingUser.getLastname()
+                        + " a quitté l'équipe " + team.getName(),          // message
+                NotificationType.TEAM_LEFT,                                 // type
+                teamId,                                                     // referenceId
+                data                                                        // data
+        );
     }
 
 }
